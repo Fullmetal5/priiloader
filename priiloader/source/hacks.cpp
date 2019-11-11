@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <string.h>
 #include <vector>
 #include <unistd.h>
+#include <fstream>
 
 #include "gecko.h"
 #include "hacks.h"
@@ -38,6 +39,13 @@ std::vector<system_hack> system_hacks;
 u32 *states_hash=NULL;
 unsigned int foff=0;
 
+bool reading_nand = false;
+s64 file_offset = 0;
+std::ifstream* sd_file_handler = NULL;
+s32 nand_file_handler = -1;
+s32 file_size = 0;
+
+//TODO : delete this function & everything it uses when we are done
 s8 LoadSystemHacks_Old(bool Force_Load_Nand);
 
 void _showError(const char* errorMsg, ...)
@@ -57,12 +65,231 @@ void _showError(const char* errorMsg, ...)
 	return;
 }
 
-s8 LoadSystemHacks(bool Force_Load_Nand)
+bool GetLine(std::string& line)
 {
-	return LoadSystemHacks_Old(Force_Load_Nand);
+	char* buf = NULL;
+	try
+	{
+		//Read untill a newline is found		
+		if (reading_nand)
+		{
+			u32 read_count = 0;
+			u32 file_pos = 0;
+			const u32 block_size = 32;
+
+			//get current file position
+			STACK_ALIGN(fstats, status, sizeof(fstats), 32);
+			ISFS_GetFileStats(nand_file_handler, status);
+			file_pos = status->file_pos;
+
+			//read untill we have a newline
+			do
+			{		
+				read_count++;
+				//are we dealing with a potential overflow?
+				if (read_count > 1000)
+				{
+					error = ERROR_MALLOC;
+					throw "line to long";
+				}
+
+				if (buf)
+					buf = (char*)mem_realloc(buf, ALIGN32(block_size*read_count));
+				else
+					buf = (char*)mem_align(32, block_size*read_count);
+
+				if (!buf)
+				{
+					error = ERROR_MALLOC;
+					throw "error allocating buffer";
+				}
+				
+				u32 addr = (u32)buf;
+				if (read_count > 1)
+					addr += block_size*(read_count - 1);
+				else
+					memset(buf, 0, block_size*read_count);
+
+			
+				s32 ret = ISFS_Read(nand_file_handler, (void*)addr, block_size);
+				if (ret < 0)
+				{
+					throw "Error reading from NAND";
+				}					
+			}while (0);//strnstr(buf, "\n", block_size*read_count) == NULL && strnstr(buf, "\r", block_size*read_count) == NULL);
+
+			std::string read_line(buf);
+			mem_free(buf);
+
+			//find the newline and split the string
+			std::string cut_string = read_line.substr(0,read_line.find("\n")-1);
+			if(cut_string.length() == 0)
+				std::string cut_string = read_line.substr(0,read_line.find("\r") -1);
+
+			//set the new file position untill after the \r\n, \r or \n
+			file_pos += cut_string.length()+(read_line.length() - cut_string.length());
+
+			if (cut_string.back() == '\r')
+				cut_string.back() = '\0';
+			if (cut_string.front() == '\r')
+				cut_string = cut_string.substr(0, cut_string.length() - 1);
+
+			line = cut_string;
+			
+			//seek file back correctly
+			ISFS_Seek(nand_file_handler, file_pos, SEEK_SET);
+		}
+		else
+		{
+			std::string read_line;
+			std::getline(*sd_file_handler, read_line);
+			if (read_line.back() == '\r')
+				read_line.back() = '\0';
+			if (read_line.front() == '\r')
+				read_line = read_line.substr(0, read_line.length() - 1);
+
+			line = read_line;
+		}
+		return true;
+	}
+	catch (char const* ex)
+	{
+		if (buf)
+			mem_free(buf);
+
+		if(ex)
+			gprintf("exception thrown : %s\r\n",ex);
+
+		line = "";
+		return false;
+	}
+	catch(...)
+	{
+		if (buf)
+			mem_free(buf);
+		
+		gprintf("General Exception thrown\r\n",ex);
+
+		line = "";
+		return false;
+	}
+}
+bool _processLine(std::string line)
+{
+	printf("processing line : %s\r\n", line.c_str());
+	return true;
 }
 
+s8 LoadSystemHacks(bool load_nand)
+{
+	reading_nand = load_nand;
+	file_offset = 0;
+	file_size = 0;
 
+	//system_hacks already loaded
+	if (system_hacks.size()) 
+	{
+		system_hacks.clear();
+		if (states_hash)
+		{
+			mem_free(states_hash);
+		}
+	}
+
+	//clear any possible open handlers
+	if (reading_nand && nand_file_handler >= 0)
+	{
+		ISFS_Close(nand_file_handler);
+		nand_file_handler = -1;
+	}
+	else if (!reading_nand && sd_file_handler != NULL)
+	{
+		if(sd_file_handler->is_open())
+			sd_file_handler->close();
+
+		delete sd_file_handler;
+		sd_file_handler = NULL;
+	}
+
+	//read the hacks file size
+	if (!reading_nand)
+	{
+		sd_file_handler = new std::ifstream("fat:/apps/priiloader/hacks_hash.ini");
+		if (!sd_file_handler || !sd_file_handler->is_open())
+		{
+			sd_file_handler = NULL;
+			//_showError("file open error");
+			gprintf("fopen error : strerror %s\r\n", strerror(errno));
+		}
+		else
+		{
+			sd_file_handler->seekg(0, std::ios::end);
+			file_size = sd_file_handler->tellg();
+
+			sd_file_handler->seekg(0, std::ios::beg);
+		}		
+	}
+
+	//no file opened from FAT device, so lets open the nand file
+	if (!sd_file_handler)
+	{
+		printf("opening nand\r\n");
+		reading_nand = true;
+		nand_file_handler = ISFS_Open("/title/00000001/00000002/data/hackshas.ini", 1);
+		if (nand_file_handler < 0)
+		{
+			gprintf("LoadHacks : hacks_hash.ini not on FAT or Nand. ISFS_Open error %d\r\n", nand_file_handler);
+			return 0;
+		}
+
+		STACK_ALIGN(fstats, status, sizeof(fstats), 32);
+		ISFS_GetFileStats(nand_file_handler, status);
+		file_size = status->file_length;
+	}
+
+	if (file_size == 0)
+	{
+		if (!load_nand)
+			_showError("Error \"hacks_hash.ini\" is 0 byte!");
+
+		if (reading_nand)
+		{
+			ISFS_Close(nand_file_handler);
+			nand_file_handler = -1;
+		}			
+		else
+		{
+			sd_file_handler->close();
+			delete sd_file_handler;
+			sd_file_handler = NULL;
+		}
+
+		return 0;
+	}
+
+	//Process File
+	std::string line;
+	while (GetLine(line))
+	{
+		_processLine(line);
+	}
+
+
+	//cleanup on aisle 4
+	if (reading_nand)
+	{
+		ISFS_Close(nand_file_handler);
+		nand_file_handler = -1;
+	}
+	else
+	{
+		sd_file_handler->close();
+		delete sd_file_handler;
+		sd_file_handler = NULL;
+	}
+
+	return 1;
+}
 
 char *GetLine( char *astr, unsigned int len)
 {
@@ -97,8 +324,6 @@ char *GetLine( char *astr, unsigned int len)
 			return NULL;
 		}
 	}
-
-	//printf("%d\n", llen );
 
 	char *lbuf = (char*)mem_malloc( llen );
 	if( lbuf == NULL )
@@ -146,7 +371,7 @@ s8 LoadSystemHacks_Old( bool Force_Load_Nand )
 	{
 		in = fopen ("fat:/apps/priiloader/hacks_hash.ini","rb");
 		if(!in)
-			gprintf("fopen error : strerror %s\n",strerror(errno));
+			gprintf("fopen error : strerror %s\r\n",strerror(errno));
 
 	}
 	if( !in )
@@ -154,7 +379,7 @@ s8 LoadSystemHacks_Old( bool Force_Load_Nand )
 		fd = ISFS_Open("/title/00000001/00000002/data/hackshas.ini", 1 );
 		if( fd < 0 )
 		{
-			gprintf("LoadHacks : hacks_hash.ini not on FAT or Nand. ISFS_Open error %d\n",fd);
+			gprintf("LoadHacks : hacks_hash.ini not on FAT or Nand. ISFS_Open error %d\r\n",fd);
 			return 0;
 		} 
 		mode = false;
