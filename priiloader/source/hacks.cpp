@@ -67,7 +67,7 @@ void _showError(const char* errorMsg, ...)
 
 bool GetLine(std::string& line)
 {
-	char* buf = NULL;
+	char* buf = NULL;	
 	try
 	{
 		//Read untill a newline is found		
@@ -75,6 +75,7 @@ bool GetLine(std::string& line)
 		{
 			u32 read_count = 0;
 			u32 file_pos = 0;
+			const u16 max_loop = 1000;
 			const u32 block_size = 32;
 
 			//get current file position
@@ -82,12 +83,23 @@ bool GetLine(std::string& line)
 			ISFS_GetFileStats(nand_file_handler, status);
 			file_pos = status->file_pos;
 
-			//read untill we have a newline
-			do
-			{		
+			//read untill we have a newline or reach EOF
+			gprintf("file_pos : %d \r\nfilesize : %d\r\n",file_pos,status->file_length);
+			while (
+					file_pos < status->file_length &&
+					( 
+						buf == NULL || 
+						(
+							file_pos+strnlen(buf,block_size*max_loop) < status->file_length &&
+							strstr(buf, "\n") == NULL && 
+							strstr(buf, "\r") == NULL
+						)
+					)
+				)
+			{						
 				read_count++;
 				//are we dealing with a potential overflow?
-				if (read_count > 1000)
+				if (read_count > max_loop)
 				{
 					error = ERROR_MALLOC;
 					throw "line to long";
@@ -110,29 +122,44 @@ bool GetLine(std::string& line)
 				else
 					memset(buf, 0, block_size*read_count);
 
-			
 				s32 ret = ISFS_Read(nand_file_handler, (void*)addr, block_size);
 				if (ret < 0)
 				{
 					throw "Error reading from NAND";
-				}					
-			}while (0);//strnstr(buf, "\n", block_size*read_count) == NULL && strnstr(buf, "\r", block_size*read_count) == NULL);
+				}
+
+				if(strlen(buf) > block_size*max_loop)
+				{
+					throw "buf has overflown its max size during loop";
+				}
+			}
+
+			//nothing was read
+			if(!buf)
+			{
+				line = "";
+				return false;
+			}
 
 			std::string read_line(buf);
 			mem_free(buf);
 
 			//find the newline and split the string
-			std::string cut_string = read_line.substr(0,read_line.find("\n")-1);
+			std::string cut_string = read_line.substr(0,read_line.find("\n"));
 			if(cut_string.length() == 0)
-				std::string cut_string = read_line.substr(0,read_line.find("\r") -1);
+				std::string cut_string = read_line.substr(0,read_line.find("\r"));
 
 			//set the new file position untill after the \r\n, \r or \n
-			file_pos += cut_string.length()+(read_line.length() - cut_string.length());
+			file_pos += cut_string.length();
 
-			if (cut_string.back() == '\r')
-				cut_string.back() = '\0';
-			if (cut_string.front() == '\r')
+			//cut off any carriage returns
+			if(cut_string.back() == '\r')
+			{
 				cut_string = cut_string.substr(0, cut_string.length() - 1);
+				file_pos++;
+			}
+			if(cut_string.front() == '\r')
+				cut_string = cut_string.substr(1, cut_string.length() - 1);
 
 			line = cut_string;
 			
@@ -141,6 +168,7 @@ bool GetLine(std::string& line)
 		}
 		else
 		{
+			//SD is so much easier... xD
 			std::string read_line;
 			std::getline(*sd_file_handler, read_line);
 			if (read_line.back() == '\r')
@@ -150,7 +178,7 @@ bool GetLine(std::string& line)
 
 			line = read_line;
 		}
-		return true;
+		return line.length() > 0;
 	}
 	catch (char const* ex)
 	{
@@ -158,7 +186,7 @@ bool GetLine(std::string& line)
 			mem_free(buf);
 
 		if(ex)
-			gprintf("exception thrown : %s\r\n",ex);
+			gprintf("Exception was thrown : %s\r\n",ex);
 
 		line = "";
 		return false;
@@ -168,7 +196,7 @@ bool GetLine(std::string& line)
 		if (buf)
 			mem_free(buf);
 		
-		gprintf("General Exception thrown\r\n",ex);
+		gprintf("General Exception thrown\r\n");
 
 		line = "";
 		return false;
@@ -176,7 +204,7 @@ bool GetLine(std::string& line)
 }
 bool _processLine(std::string line)
 {
-	printf("processing line : %s\r\n", line.c_str());
+	gprintf("processing line : %s\r\n", line.c_str());
 	return true;
 }
 
@@ -233,7 +261,7 @@ s8 LoadSystemHacks(bool load_nand)
 	//no file opened from FAT device, so lets open the nand file
 	if (!sd_file_handler)
 	{
-		printf("opening nand\r\n");
+		gprintf("opening nand\r\n");
 		reading_nand = true;
 		nand_file_handler = ISFS_Open("/title/00000001/00000002/data/hackshas.ini", 1);
 		if (nand_file_handler < 0)
