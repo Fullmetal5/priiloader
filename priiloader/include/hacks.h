@@ -22,9 +22,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Global.h"
 #include <string>
 
-struct patch_struct {
+struct system_patch {
 	std::vector<uint8_t> hash;
-	std::vector<uint8_t> offset;
+	u32 offset;
 	std::vector<uint8_t> patch;
 };
 struct system_hack {
@@ -32,7 +32,7 @@ struct system_hack {
 	unsigned int max_version;
 	unsigned int min_version;
 	unsigned int amount;
-	std::vector< patch_struct > patches;
+	std::vector< system_patch > patches;
 };
 
 extern std::vector<system_hack> system_hacks;

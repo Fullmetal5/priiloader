@@ -172,7 +172,7 @@ bool GetLine(std::string& line)
 			std::string read_line;
 			std::getline(*sd_file_handler, read_line);
 			if (read_line.back() == '\r')
-				read_line.back() = '\0';
+				read_line = read_line.substr(0, read_line.length() - 1);
 			if (read_line.front() == '\r')
 				read_line = read_line.substr(0, read_line.length() - 1);
 
@@ -202,10 +202,65 @@ bool GetLine(std::string& line)
 		return false;
 	}
 }
-bool _processLine(std::string line)
+bool _processLine(system_hack& hack, std::string line)
 {
-	gprintf("processing line : %s\r\n", line.c_str());
-	return true;
+	try
+	{
+		system_patch temp_patch;
+		if(hack.patches.size() > 0)
+			temp_patch = hack.patches.back();
+		else
+			hack.patches.push_back(temp_patch);
+
+		gprintf("processing line : %s\r\n", line.c_str());
+		if(line.front() == '[' && line.back() == ']')
+		{
+			line = line.substr(1,line.length()-2);
+			hack.desc = line;
+		}
+		else if(line.substr(0,7) == "amount=")
+		{
+			//not needed line, but we used to have it. we do nothing with it
+			return true;
+		}
+		else if(line.substr(0,6) == "patch=")
+		{
+			//process patch
+			//example : patch=0x38000001,0x2c000000,0x900DA5D8,0x38000032
+		}
+		else if(line.substr(0,5) == "hash=")
+		{
+			//process hash
+			//example : hash=0x38000000,0x2c000000,0x40820010,0x38000036,0x900da9c8,0x480017
+		}
+		else if(line.substr(0,7) == "offset=")
+		{
+			//process offset
+			//example : offset=0x81000000
+			if(temp_patch.patch.size() > 0 && temp_patch.offset > 0)
+				return true;
+		}
+		else
+		{
+			throw "unknown line type : " + line.substr(0,6);
+		}
+		return true;
+	}
+	catch (char const* ex)
+	{
+		gprintf("_processLine Exception -> %s\r\n");
+		return false;
+	}
+	catch(...)
+	{
+		if(line.length() > 0)
+			gprintf("_processLine Exception : invalid line to process -> '%s'\r\n",line.c_str());
+		else
+			gprintf("_processLine Exception : general exception thrown\r\n");
+
+		return false;
+	}
+	
 }
 
 s8 LoadSystemHacks(bool load_nand)
@@ -297,9 +352,58 @@ s8 LoadSystemHacks(bool load_nand)
 
 	//Process File
 	std::string line;
+	system_hack new_hack;
+
+	/*
+	system_patch new_patch;
+	new_patch.hash.push_back(0x80);
+	new_patch.offset.push_back(0x81);
+	new_patch.patch.push_back(0x41);
+	new_hack.patches.push_back(new_patch);
+	system_patch* test = &new_hack.patches.back();
+	test->patch.back() = 0x42;
+	system_patch test2 = new_hack.patches.back();
+	gprintf("last element patch : 0x%02X vs 0x%02X\r\n",test2.patch.back(),test->patch.back());*/
+
 	while (GetLine(line))
 	{
-		_processLine(line);
+		//Specs of this loop/function : 
+		// - read the line and put it in the correct part of the hack
+		// - if we read a description while we already have one, we will check if the hack is complete, and push it to the list if it is
+		//																								-> if it isn't complete, drop it
+		// - the same will be done with patches
+		// - if hash or offset is found -> we don't have a patch yet		-> drop patch and start anew
+		//								-> we have a patch					-> we start a new one
+		// - if patch is found			-> and we don't have a hash/offset	-> ignore
+		//								-> we have a hash/offset			-> append
+		// - amount will be ignored. its not really needed...
+		//_processLine will place everything in the correct spot in the struct/class
+
+		//new hack? process previous one and add it
+		if(line.front() == '[' && line.back() == ']')
+		{
+			if(
+				new_hack.min_version != 0 &&
+				new_hack.max_version != 0 &&
+				new_hack.desc.length() > 0 &&
+				new_hack.patches.size() > 0
+				)
+			{
+				gprintf("pushing back %s\r\n",new_hack.desc.c_str());
+				system_hacks.push_back(new_hack);
+			}
+
+			if(new_hack.desc.length() > 0)
+				gprintf("deleting %s\r\n",new_hack.desc.c_str());
+
+			new_hack.patches.clear();
+			new_hack.desc.clear();
+			new_hack.amount = 0;
+			new_hack.max_version = 0;
+			new_hack.min_version = 0;
+		}
+
+		_processLine(new_hack,line);
 	}
 
 
@@ -460,7 +564,7 @@ s8 LoadSystemHacks_Old( bool Force_Load_Nand )
 	char *str=buf;
 	char *lbuf=NULL;
 	unsigned int line = 1;
-	patch_struct temp;
+	system_patch temp;
 	temp.hash.clear();
 	temp.patch.clear();
 	system_hack new_system_hacks;

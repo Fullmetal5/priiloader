@@ -1863,7 +1863,7 @@ void BootMainSysMenu( u8 init )
 			if(states_hash[i] == 1)
 			{
 				u32 add = 0;
-				for(u32 y = 0; y < system_hacks[i].amount;y++)
+				for(u32 y = 0; y < system_hacks[i].patches.size();y++)
 				{
 					while( add + (u32)mem_block < max_address)
 					{
