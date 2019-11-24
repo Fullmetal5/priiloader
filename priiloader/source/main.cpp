@@ -100,7 +100,6 @@ typedef struct {
 }Binary_struct;
 
 extern DVD_status DVD_state;
-extern u32 *states_hash;
 
 //overwrite the weak variable in libogc that enables malloc to use mem2. this disables it
 u32 MALLOC_MEM2 = 0;
@@ -277,7 +276,7 @@ handle_hacks_fail:
 					fail=7;
 					goto handle_hacks_s_fail;
 				}
-				if(ISFS_Write( fd, states_hash, sizeof( u32 ) * system_hacks.size() )<0)
+				if(ISFS_Write( fd, &states_hash[0], states_hash.size() )<0)
 				{
 					fail = 8;
 					ISFS_Close(fd);
@@ -370,6 +369,7 @@ handle_hacks_s_fail:
 			//printf("\x1b[2;0HHackCount:%d DispCount:%d cur_off:%d menu_off:%d Hacks:%d   \r\n", HackCount, DispCount, cur_off, menu_off, system_hacks.size() );
 			u32 j=0;
 			u32 skip=menu_off;
+
 			for( u32 i=0; i<system_hacks.size(); ++i)
 			{
 				if( system_hacks[i].max_version >= SysVersion && system_hacks[i].min_version <= SysVersion)
@@ -1506,12 +1506,12 @@ void BootMainSysMenu( u8 init )
 	//memory block variables used within the function:
 	//ticket stuff:
 	char * buf = NULL;
-	fstats * tstatus = NULL;
+	fstats *status = NULL;
 
 	//TMDview stuff:
-	u64 TitleID=0x0000000100000002LL;
+	const u64 TitleID=0x0000000100000002LL;
 	u32 tmd_size;
-	static u8 tmd_buf[(sizeof(tmd_view) + MAX_NUM_TMD_CONTENTS*sizeof(tmd_view_content))] ATTRIBUTE_ALIGN(32);
+	u8 tmd_buf[(sizeof(tmd_view) + MAX_NUM_TMD_CONTENTS*sizeof(tmd_view_content))] ATTRIBUTE_ALIGN(32);
 	tmd_view *rTMD = NULL;
 
 	//TMD:
@@ -1519,14 +1519,13 @@ void BootMainSysMenu( u8 init )
 
 	//boot file:
 	unsigned int fileID = 0;
-	char file[265] ATTRIBUTE_ALIGN(32);
-	fstats *status = NULL;
+	char file[64] ATTRIBUTE_ALIGN(32);
+	
 	dolhdr *boot_hdr = NULL;
 
-	//hacks : hashes
-	u8* mem_block = 0;
+	//hacks
+	u8* mem_block = NULL;
 	u32 max_address = 0;
-
 
 	//general:
 	s32 r = 0;
@@ -1699,7 +1698,11 @@ void BootMainSysMenu( u8 init )
 	entrypoint = (void (*)())(boot_hdr->entrypoint);
 	gdprintf("entrypoint %08X\r\n", entrypoint );
 
+	gprintf("loading hacks\r\n");
+
 	LoadSystemHacks(true);
+
+	gprintf("loading hacks done\r\n");
 
 	for(u8 i=0;i<WPAD_MAX_WIIMOTES;i++) {
 		if(WPAD_Probe(i,0) < 0)
@@ -1766,14 +1769,14 @@ void BootMainSysMenu( u8 init )
 		}
 
 		//get size
-		tstatus = (fstats*)mem_align( 32, sizeof( fstats ) );
-		if(tstatus == NULL)
+		status = (fstats*)mem_align( 32, sizeof( fstats ) );
+		if(status == NULL)
 		{
 			ISFS_Close( fd );
 			error = ERROR_MALLOC;
 			goto free_and_return;
 		}
-		r = ISFS_GetFileStats( fd, tstatus );
+		r = ISFS_GetFileStats( fd, status );
 		if( r < 0 )
 		{
 			ISFS_Close( fd );
@@ -1782,17 +1785,17 @@ void BootMainSysMenu( u8 init )
 		}
 
 		//create buffer
-		buf = (char*)mem_align( 32, ALIGN32(tstatus->file_length) );
+		buf = (char*)mem_align( 32, ALIGN32(status->file_length) );
 		if( buf == NULL )
 		{
 			ISFS_Close( fd );
 			error = ERROR_MALLOC;
 			goto free_and_return;
 		}
-		memset(buf, 0, tstatus->file_length );
+		memset(buf, 0, status->file_length );
 
 		//read file
-		r = ISFS_Read( fd, buf, tstatus->file_length );
+		r = ISFS_Read( fd, buf, status->file_length );
 		if( r < 0 )
 		{
 			gprintf("ES_Identify: R-err %d\r\n",r);
@@ -1830,7 +1833,7 @@ void BootMainSysMenu( u8 init )
 			__IOS_InitializeSubsystems();
 			goto free_and_return;
 		}
-		r = ES_Identify( (signed_blob *)certs_bin, certs_bin_size, (signed_blob *)TMD, tmd_size_temp, (signed_blob *)buf, tstatus->file_length, 0);
+		r = ES_Identify( (signed_blob *)certs_bin, certs_bin_size, (signed_blob *)TMD, tmd_size_temp, (signed_blob *)buf, status->file_length, 0);
 		if( r < 0 )
 		{	
 			error=ERROR_SYSMENU_ESDIVERFIY_FAILED;
@@ -1843,8 +1846,8 @@ void BootMainSysMenu( u8 init )
 	}
 
 	//ES_SetUID(TitleID);
-	if(tstatus)
-		mem_free( tstatus );
+	if(status)
+		mem_free( status );
 	if(buf)
 		mem_free( buf );
 
@@ -1854,46 +1857,62 @@ void BootMainSysMenu( u8 init )
 	DCFlushRange((void*)0x80000000,0x3400);
 
 	gprintf("Hacks:%d\r\n",system_hacks.size());
-	if(system_hacks.size() != 0)
+	mem_block = (u8*)(*boot_hdr->addressData - *boot_hdr->offsetData);
+	max_address = (u32)(*boot_hdr->sizeData + *boot_hdr->addressData);
+	for(u32 i = 0;i < system_hacks.size();i++)
 	{
-		mem_block = (u8*)(*boot_hdr->addressData - *boot_hdr->offsetData);
-		max_address = (u32)(*boot_hdr->sizeData + *boot_hdr->addressData);
-		for(u32 i = 0;i < system_hacks.size();i++)
+		gprintf("testing %s\r\n",system_hacks[i].desc.c_str());
+		if(states_hash[i] != 1)
+			continue;
+
+		gprintf("applying %s\r\n",system_hacks[i].desc.c_str());
+		u32 add = 0;
+		for(u32 y = 0; y < system_hacks[i].patches.size();y++)
 		{
-			if(states_hash[i] == 1)
+			if(system_hacks[i].patches[y].patch.size() <= 0)
+				continue;
+
+			//offset method
+			if(system_hacks[i].patches[y].offset > 0)
 			{
-				u32 add = 0;
-				for(u32 y = 0; y < system_hacks[i].patches.size();y++)
+				u8* addr = (u8*)(system_hacks[i].patches[y].offset);
+				for(u32 z = 0;z < system_hacks[i].patches[y].patch.size(); z++)
 				{
-					while( add + (u32)mem_block < max_address)
+					addr[z] = system_hacks[i].patches[y].patch[z];
+					DCFlushRange(addr, 4);
+				}
+			}
+			//hash method
+			else if(system_hacks[i].patches[y].hash.size() > 0)
+			{
+				while( add + (u32)mem_block < max_address)
+				{
+					u8 temp_hash[system_hacks[i].patches[y].hash.size()];
+					u8 temp_patch[system_hacks[i].patches[y].patch.size()];
+					for(u32 z = 0;z < system_hacks[i].patches[y].hash.size(); z++)
 					{
-						u8 temp_hash[system_hacks[i].patches[y].hash.size()];
-						u8 temp_patch[system_hacks[i].patches[y].patch.size()];
-						for(u32 z = 0;z < system_hacks[i].patches[y].hash.size(); z++)
+						temp_hash[z] = system_hacks[i].patches[y].hash[z];
+					}
+					if ( !memcmp(mem_block+add, temp_hash ,sizeof(temp_hash)) )
+					{
+						gprintf("Found %s @ 0x%X, patching hash # %d...\r\n",system_hacks[i].desc.c_str(), add+(u32)mem_block, y+1);
+						for(u32 z = 0;z < system_hacks[i].patches[y].patch.size(); z++)
 						{
-							temp_hash[z] = system_hacks[i].patches[y].hash[z];
+							temp_patch[z] = system_hacks[i].patches[y].patch[z];
 						}
-						if ( !memcmp(mem_block+add, temp_hash ,sizeof(temp_hash)) )
-						{
-							gprintf("Found %s @ 0x%X, patching hash # %d...\r\n",system_hacks[i].desc.c_str(), add+(u32)mem_block, y+1);
-							for(u32 z = 0;z < system_hacks[i].patches[y].patch.size(); z++)
-							{
-								temp_patch[z] = system_hacks[i].patches[y].patch[z];
-							}
-							memcpy(mem_block+add,temp_patch,sizeof(temp_patch) );
-							DCFlushRange((u8 *)((add+(u32)mem_block) >> 5 << 5), (sizeof(temp_patch) >> 5 << 5) + 64);
-							break;
-						}
-						add++;
-					}//end while loop
-				} //end for loop of all hashes of hack[i]
-			} //end if state[i] = 1
-		} // end general hacks loop
-	} //end if hacks > 0
+						memcpy((u8*)mem_block+add,temp_patch,sizeof(temp_patch) );
+						DCFlushRange((u8 *)((add+(u32)mem_block) >> 5 << 5), (sizeof(temp_patch) >> 5 << 5) + 64);
+						break;
+					}
+					add++;
+				}//end hash while loop
+			}//end of hash or offset check
+		} //end for loop of all patches of hack[i]
+	} // end general hacks loop
 	if(TMD)
 		mem_free(TMD);
-	if(tstatus)
-		mem_free( tstatus );
+	if(status)
+		mem_free( status );
 	if(buf)
 		mem_free( buf );
 	if(boot_hdr)
@@ -1914,8 +1933,8 @@ void BootMainSysMenu( u8 init )
 free_and_return:
 	if(TMD)
 		mem_free(TMD);
-	if(tstatus)
-		mem_free( tstatus );
+	if(status)
+		mem_free( status );
 	if(buf)
 		mem_free( buf );
 	if(boot_hdr)
