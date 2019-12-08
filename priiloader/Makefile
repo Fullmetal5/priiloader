@@ -133,9 +133,25 @@ else
 endif
 #build
 	@[ -d $@ ] || mkdir -p $@
+	@echo -----------------------------------------------
+	@echo compiling the loader...
+	@echo -----------------------------------------------
+	@echo 
+#the generated ASM by the following command has no purpose but for debugging needs.
+	@echo generating loader.s
+	@$(CC) -static -iquote include -I build -I$(LIBOGC_INC) -S loader\loader.c -o build\loader.s
+#these ones however do the actual compiling & converting to binary
+	@echo loader.c
+	@$(CC) -static -iquote include -I build -I$(LIBOGC_INC) -c loader\loader.c -o build\loader.o
+	@echo linking loader.bin	
+	@$(PREFIX)ld build\loader.o -o data\loader.bin --oformat=binary
+	@echo -----------------------------------------------
+	@echo compiling priiloader...
+	@echo -----------------------------------------------
+	@echo 
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
-#create the app for the wii
+#create the .app for the wii
 ifeq ($(UNAME),Linux)
 		@echo
 		@./OpenDolBoot $(OUTPUT).dol ../Installer/data/priiloader.app

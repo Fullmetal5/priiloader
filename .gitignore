@@ -30,3 +30,4 @@ wiki
 
 # ...even if they are in subdirectories
 Shared/gitrev.h
+priiloader/data/loader.bin

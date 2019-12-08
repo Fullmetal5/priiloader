@@ -194,9 +194,9 @@ void LoadSettings( void )
 		//file not found create a new one
 		Create_Settings_File();
 		return; // settings was created from scratch. no need to do it all over
-		//ISFS_Seek( fd, 0, 0 );
 	}
-	STACK_ALIGN(fstats,status,sizeof(fstats),32);//fstats *status = (fstats*)mem_align(32,ALIGN32(sizeof(fstats)) );
+
+	STACK_ALIGN(fstats,status,sizeof(fstats),32);
 	memset(status,0,sizeof(fstats));
 	ISFS_GetFileStats(fd,status);
 	if ( status->file_length != sizeof(Settings) )
@@ -206,17 +206,9 @@ void LoadSettings( void )
 		//recreate settings file
 		ISFS_Delete("/title/00000001/00000002/data/loader.ini");
 		Create_Settings_File();
-		/*if(status)
-		{
-			mem_free(status);
-		}*/
 		return;
-		//ISFS_Seek( fd, 0, 0 );
 	}
-	/*if(status)
-	{
-		mem_free(status);
-	}*/
+
 	if(ISFS_Read( fd, settings, sizeof( Settings ) )<0)
 	{
 		ISFS_Close( fd );

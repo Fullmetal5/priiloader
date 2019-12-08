@@ -26,7 +26,7 @@
 
 //The known HBC titles
 
-title_info HBC_Titles[] = {
+const title_info HBC_Titles[] = {
 	{ 0x0001000148415858LL, "HAXX" },
 	{ 0x000100014A4F4449LL, "JODI" },
 	{ 0x00010001AF1BF516LL, "0.7 - 1.1" },

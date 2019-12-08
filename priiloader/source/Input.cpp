@@ -78,6 +78,16 @@ s8 Input_Init( void )
 }
 void Input_Shutdown( void )
 {
+	for (int i = 0;i < WPAD_MAX_WIIMOTES ;i++)
+	{
+		if(WPAD_Probe(i,0) > 0)
+		{
+			if(WPAD_Probe(i,0) < 0)
+				continue;
+			WPAD_Flush(i);
+			WPAD_Disconnect(i);
+		}
+	}
 	WPAD_Shutdown();
 	_input_init = 0;
 }

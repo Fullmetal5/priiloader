@@ -63,6 +63,9 @@ void ShowAutoBootError(void)
 		case ERROR_SYSMENU_BOOTOPENFAILED:
 			PrintFormat( 0, 16, (rmode->viHeight)-112, "Could not open boot file!");
 			break;
+		case ERROR_SYSMENU_BOOTREADFAILED:
+			PrintFormat( 0, 16, (rmode->viHeight)-112, "Could not read boot file!");
+			break;
 		case ERROR_SYSMENU_BOOTGETSTATS:
 			PrintFormat( 0, 16, (rmode->viHeight)-112, "Could not get boot stats!");
 			break;
