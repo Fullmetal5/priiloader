@@ -25,10 +25,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <gctypes.h>
 #include "executables.h"
 
+#ifndef MAX_ADDRESS
+#define MAX_ADDRESS 0x817FFEFF
+#endif
+
 void DCFlushRange(void *startaddress,u32 len);
 void ICInvalidateRange(void* addr, u32 size);
 void _memcpy(void* dst, void* src, u32 len);
 void _memset(void* src, u32 data, u32 len);
+void startSysMenu(void);
 u32 _loadApplication(void* binary, void* parameter);
 u32 _loadSystemMenu(void* binary, void* parameter, u32 parameterCount);
 
@@ -36,6 +41,33 @@ u32 _loadSystemMenu(void* binary, void* parameter, u32 parameterCount);
 //when run, we will jump to addr 0 of the compiled code. if this is on top, this will be the code run
 void _start(void* binary, void* parameter, u32 parameterCount, u8 isSystemMenu)
 {
+	/*this would make the loader fully stand alone (stack pointer in mem2)
+	and capable of loading any dol in mem1
+	however, this somehow breaks loading system menu (and dols/elfs)
+	if i can figure out why, i'll need to rewrite _start in asm and 
+	1) load the arguments (into some registers or something)
+	2) change r1/r31 to the new stack address
+	3) save arguments to the new stack
+	3) do our magic of moving the dol around
+	4) ??? (unknown magic atm)
+	5) PROFIT !!! (dol loaded)
+	this is test code and must under no reason be used!! */
+
+	/*u32 s;
+	#define STACK_PTR_PREV *(vu32*)0x93FFFFE0
+	asm volatile("lwz %0,0(31) ; sync" : "=r"(s));
+	STACK_PTR_PREV = s;
+	asm(R"(
+		lis		1,0x93F00000@h
+		ori		1,1,0x93F00000@l
+		stwu 1,-0(1)
+		stw 31,44(1)
+		mr 31,1)");
+	u32 prev_stack = s;
+	u32 test = 0xDEAD;
+	test = 0xBEEF;
+	*(vu32*)0x817FFFF0 = 0x01;*/
+
 	if(binary == NULL || (parameter == NULL && parameterCount > 0))
 		return;
 
@@ -43,20 +75,24 @@ void _start(void* binary, void* parameter, u32 parameterCount, u8 isSystemMenu)
 	if(!ep)
 		return;
 
+	*(vu32*)0x800000F8 = 0x0E7BE2C0;				// Bus Clock Speed
+	*(vu32*)0x800000FC = 0x2B73A840;				// CPU Clock Speed
+	*(vu32*)0x8000315C = 0x80800113;				// DI Legacy mode ?
+
 	if(isSystemMenu)
 	{
-		if(ep != 0x80003400)
-			return;
-
 		mtmsr(mfmsr() & ~0x8000);
 		mtmsr(mfmsr() | 0x2002);
+		startSysMenu();
 	}
 	else
 	{
 		void	(*entrypoint)();
 		entrypoint = (void (*)())(ep);
+		asm("isync");
 		entrypoint();
 	}
+	
 	return;
 }
 
@@ -70,7 +106,7 @@ u32 _loadApplication(void* binary, void* parameter)
 		ElfHdr->e_ident[EI_MAG2] == 'L' &&
 		ElfHdr->e_ident[EI_MAG3] == 'F' )
 	{
-		if( (ElfHdr->e_entry | 0x80000000) < 0x80003400 && (ElfHdr->e_entry | 0x80000000) >= 0x817FFEFF )
+		if( (ElfHdr->e_entry | 0x80000000) < 0x80003400 && (ElfHdr->e_entry | 0x80000000) >= MAX_ADDRESS )
 		{
 			return 0;
 		}
@@ -110,7 +146,7 @@ u32 _loadApplication(void* binary, void* parameter)
 		dolfile = (dolhdr *)binary;
 
 		//entrypoint & BSS checking
-		if( (dolfile->entrypoint | 0x80000000) < 0x80003400 || (dolfile->entrypoint | 0x80000000) >= 0x817FFEFF )
+		if( (dolfile->entrypoint | 0x80000000) < 0x80003400 || (dolfile->entrypoint | 0x80000000) >= MAX_ADDRESS )
 		{
 			return 0;
 		}
@@ -122,6 +158,7 @@ u32 _loadApplication(void* binary, void* parameter)
 			//place IOS reload here
 		}
 
+		//copy text sections
 		for (s8 i = 0; i < 7; i++) {
 			if ((!dolfile->sizeText[i]) || (dolfile->addressText[i] < 0x100)) 
 				continue;
@@ -130,40 +167,62 @@ u32 _loadApplication(void* binary, void* parameter)
 			ICInvalidateRange((void *) dolfile->addressText[i],dolfile->sizeText[i]);
 		}
 
+		//copy data sections
 		for (s8 i = 0; i < 11; i++) {
-			if ((!dolfile->sizeData[i]) || (dolfile->offsetData[i] < 0x100)) continue;
+			if ((!dolfile->sizeData[i]) || (dolfile->offsetData[i] < 0x100)) 
+				continue;
 			_memcpy ((void *) dolfile->addressData[i],binary+dolfile->offsetData[i],dolfile->sizeData[i]);
 			DCFlushRange((void *) dolfile->offsetData[i],dolfile->sizeData[i]);
 		}
 
 		if( 
-			( dolfile->addressBSS + dolfile->sizeBSS < 0x80F00000 ||(dolfile->addressBSS > 0x81500000 && dolfile->addressBSS + dolfile->sizeBSS < 0x817FFFFF) ) &&
+			( dolfile->addressBSS + dolfile->sizeBSS < 0x80F00000 ||(dolfile->addressBSS > 0x81500000 && dolfile->addressBSS + dolfile->sizeBSS < MAX_ADDRESS) ) &&
 			dolfile->addressBSS > 0x80003400 )
 		{
 			_memset ((void *) dolfile->addressBSS, 0, dolfile->sizeBSS);
 			DCFlushRange((void *) dolfile->addressBSS, dolfile->sizeBSS);
 		}
-		if (args != NULL && args->argvMagic == ARGV_MAGIC)
+
+		//copy over arguments, but only if the dol is meant to have them
+		//devkitpro dol's have room in them to have the argument struct copied over them
+		//others, not so much (like compressed dols)
+		if (*(vu32*)(dolfile->entrypoint + 8 | 0x80000000) == 0x00 && args != NULL && args->argvMagic == ARGV_MAGIC)
         {
 			void* new_argv = (void*)(dolfile->entrypoint + 8);
 			_memcpy(new_argv, args, sizeof(struct __argv));
 			DCFlushRange(new_argv, sizeof(struct __argv));
         }
 		return(dolfile->entrypoint | 0x80000000);
-	}	
-	 return 0;
+	}
+	return 0;
 }
 
 u32 _loadSystemMenu(void* binary, void* parameter, u32 parameterCount)
-{
+{	
+	u32 entrypoint = _loadApplication(binary,NULL);
 
-	//add check to see if entrypoint == 0x00003400 here
-	//if( boot_hdr->entrypoint != 0x3400 )
-	
+	if(entrypoint != 0x80003400)
+		return 0;
+
 	/* offset patches will go here*/
 
-	return _loadApplication(binary,NULL);
+	return entrypoint;
 }
+
+//unstub asm code by crediar. basically boots the system menu NAND boot code
+asm(R"(.globl startSysMenu
+startSysMenu:
+        isync
+#set MSR[DR:IR] = 00, jump to STUB
+        lis 3,0x3400@h
+        ori 3,3,0x3400@l
+        mtsrr0 3
+
+        mfmsr 3
+        li 4,0x30
+        andc 3,3,4
+        mtsrr1 3
+        rfi)");
 
 //copy of libogc & gcc, this is to have the loader as small as possible
 //this is very bad practice , but this source is meant to be copied to memory and ran as stand alone code

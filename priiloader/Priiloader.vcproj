@@ -161,10 +161,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\source\unstub.S"
-				>
-			</File>
-			<File
 				RelativePath=".\source\usbstorage.c"
 				>
 			</File>

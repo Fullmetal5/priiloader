@@ -43,13 +43,13 @@ s32 nand_file_handler = -1;
 
 void _showError(const char* errorMsg, ...)
 {
-	char astr[2048];
-	memset(astr, 0, 2048);
+	char astr[1024];
+	memset(astr, 0, 1024);
 
 	va_list ap;
 	va_start(ap, errorMsg);
 
-	vsnprintf(astr, 2047, errorMsg, ap);
+	vsnprintf(astr, 1024, errorMsg, ap);
 
 	va_end(ap);
 
@@ -66,7 +66,7 @@ bool GetLine(bool reading_nand, std::string& line)
 		//Read untill a newline is found		
 		if (reading_nand)
 		{
-			u32 read_count = 0;
+			/*u32 read_count = 0;
 			u32 file_pos = 0;
 			const u16 max_loop = 1000;
 			const u32 block_size = 32;
@@ -155,7 +155,7 @@ bool GetLine(bool reading_nand, std::string& line)
 			line = cut_string;
 
 			//seek file back correctly
-			ISFS_Seek(nand_file_handler, file_pos, SEEK_SET);
+			ISFS_Seek(nand_file_handler, file_pos, SEEK_SET);*/
 		}
 		else
 		{
@@ -173,15 +173,15 @@ bool GetLine(bool reading_nand, std::string& line)
 	}
 	catch (char const* ex)
 	{
-		gprintf("GetLine Exception was thrown : %s\r\n",ex);
+		gprintf("GetLine Exception : %s",ex);
 	}
 	catch (const std::string& ex)
 	{
-		gprintf("GetLine Exception was thrown : %s\r\n",ex);
+		gprintf("GetLine Exception : %s",ex);
 	}
 	catch(...)
 	{	
-		gprintf("GetLine General Exception thrown\r\n");
+		gprintf("GetLine General Exception");
 	}
 
 	if (buf)
@@ -193,7 +193,7 @@ bool _processLine(system_hack& hack, std::string &line)
 {
 	try
 	{
-		gdprintf("processing %s\r\n",line.c_str());
+		gdprintf("processing %s",line.c_str());
 		if(line.front() == '[' && line.back() == ']')
 		{
 			line = line.substr(1,line.length()-2);
@@ -336,7 +336,7 @@ bool _processLine(system_hack& hack, std::string &line)
 			//process offset
 			//example : offset=0x81000000
 			if(values.front().size() != 10)
-				throw "Invalid offset : " + value;
+				throw "Invalid offset : " + values.front().size();
 
 			//save the old patch and start a new one.
 			if(temp_patch->patch.size() > 0 && ( temp_patch->hash.size() > 0 || temp_patch->offset != 0 ))
@@ -350,25 +350,25 @@ bool _processLine(system_hack& hack, std::string &line)
 		}
 		else
 		{
-			throw "unknown line type : " + type;
+			throw "unknown type : " + type;
 		}
 		return true;
 	}
 	catch (const std::string& ex)
 	{
-		gprintf("_processLine Exception -> %s\r\n",ex.c_str());
+		gprintf("_processLine Exception: %s",ex.c_str());
 	}
 	catch (char const* ex)
 	{
-		gprintf("_processLine Exception -> %s\r\n",ex);
+		gprintf("_processLine Exception: %s",ex);
 	}
 	catch(...)
 	{
-		gprintf("_processLine General Exception : invalid line to process\r\n");		
+		gprintf("_processLine General Exception: invalid line");		
 	}	
 
 	if(line.length() > 0)
-		gprintf("line : %s\r\n",line.c_str());
+		gprintf("line : %s",line.c_str());
 
 	return false;
 }
@@ -385,17 +385,17 @@ bool _addOrRejectHack(system_hack& hack)
 			hack.patches.back().patch.size() > 0
 			)
 		{
-			gdprintf("loaded %s (v%d - v%d)\r\n",hack.desc.c_str(),hack.min_version,hack.max_version);
+			gdprintf("loaded %s (v%d - v%d)",hack.desc.c_str(),hack.min_version,hack.max_version);
 			system_hacks.push_back(hack);
 			return true;
 		}
 
-		gdprintf("dropping hack %s\r\n",hack.desc.c_str());
+		gdprintf("dropping hack %s",hack.desc.c_str());
 		return false;
 	}
 	catch(...)
 	{
-		gprintf("General _addOrRejectHack exception thrown\r\n");
+		gprintf("General _addOrRejectHack exception thrown");
 		return false;
 	}
 }
@@ -432,7 +432,7 @@ s8 LoadSystemHacks(bool load_nand)
 		if (!sd_file_handler || !sd_file_handler->is_open())
 		{
 			sd_file_handler = NULL;
-			gprintf("fopen error : %s\r\n", strerror(errno));
+			gprintf("fopen error : %s", strerror(errno));
 		}
 		else
 		{
@@ -450,7 +450,7 @@ s8 LoadSystemHacks(bool load_nand)
 		nand_file_handler = ISFS_Open("/title/00000001/00000002/data/hackshas.ini", 1);
 		if (nand_file_handler < 0)
 		{
-			gprintf("LoadHacks : hacks_hash.ini not on FAT or Nand. ISFS_Open error %d\r\n", nand_file_handler);
+			gprintf("LoadHacks : hacks_hash.ini not on FAT or Nand. ISFS_Open error %d", nand_file_handler);
 			return 0;
 		}
 
@@ -587,14 +587,14 @@ s8 LoadSystemHacks(bool load_nand)
 		nand_file_handler = ISFS_CreateFile("/title/00000001/00000002/data/hacksh_s.ini", 0, 3, 3, 3);
 		if(nand_file_handler < 0 )
 		{		
-			gprintf("LoadHacks : hacksh_s(states) could not be created. ISFS_CreateFile error %d\r\n", nand_file_handler);
+			gprintf("LoadHacks : hacksh_s(states) could not be created. ISFS_CreateFile error %d", nand_file_handler);
 			return 0;
 		}
 
 		nand_file_handler = ISFS_Open("/title/00000001/00000002/data/hacksh_s.ini", 1|2 );
 		if( nand_file_handler < 0 )
 		{
-			gprintf("LoadHacks : hacksh_s(states) could not be loaded. ISFS_Open error %d\r\n", nand_file_handler);
+			gprintf("LoadHacks : hacksh_s(states) could not be loaded. ISFS_Open error %d", nand_file_handler);
 			return 0;
 		}
 

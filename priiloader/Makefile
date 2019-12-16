@@ -20,6 +20,7 @@ BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data  
 INCLUDES	:=  include
+ENTRYPOINT	:=	0x81100000
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -28,7 +29,7 @@ INCLUDES	:=  include
 CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE)
 CXXFLAGS	=	$(CFLAGS)
 
-LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map -Wl,--section-start,.init=0x81000000
+LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map -Wl,--section-start,.init=$(ENTRYPOINT)
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
@@ -91,18 +92,19 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 					-L$(LIBOGC_LIB)
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
-.PHONY: $(BUILD) clean
+.PHONY: build clean pre_build loader build_priiloader post_build
 #---------------------------------------------------------------------------------
 #lets see what OS we are on
 UNAME := $(shell uname)
 NUMBER := $(shell bash -c 'echo $$RANDOM')
 
 #build order
-all: $(BUILD) run
+all: build run
 
 #actual build script
-$(BUILD):
-#pre-checks
+build: pre_build loader build_priiloader post_build
+
+pre_build:
 ifeq ($(wildcard ./data/certs.bin),)
 	@echo "wii-cert is missing (certs.bin)."
 	@echo "please add your wii's certificate in the data directory"
@@ -111,7 +113,6 @@ ifeq ($(wildcard ./data/certs.bin),)
 	@exit 1
 endif
 
-#pre-build
 ifeq ($(wildcard ../.git/.),)
 	@echo
 	@echo
@@ -131,7 +132,12 @@ else
 #	-> system("call cmd /c ..\\Shared\\make_git.bat");
 		@../Shared/GitVersion.exe
 endif
-#build
+
+ifeq ($(wildcard ./$(BUILD)),)
+	@mkdir $(BUILD)
+endif
+
+loader: 
 	@[ -d $@ ] || mkdir -p $@
 	@echo -----------------------------------------------
 	@echo compiling the loader...
@@ -139,18 +145,21 @@ endif
 	@echo 
 #the generated ASM by the following command has no purpose but for debugging needs.
 	@echo generating loader.s
-	@$(CC) -static -iquote include -I build -I$(LIBOGC_INC) -S loader\loader.c -o build\loader.s
+	@$(CC) -iquote include -I build -I$(LIBOGC_INC) -DMAX_ADDRESS=$(ENTRYPOINT) -S loader\loader.c -o build\loader.s
 #these ones however do the actual compiling & converting to binary
 	@echo loader.c
-	@$(CC) -static -iquote include -I build -I$(LIBOGC_INC) -c loader\loader.c -o build\loader.o
+	@$(CC) -iquote include -I build -I$(LIBOGC_INC) -DMAX_ADDRESS=$(ENTRYPOINT) -c loader\loader.c -o build\loader.o
 	@echo linking loader.bin	
-	@$(PREFIX)ld build\loader.o -o data\loader.bin --oformat=binary
+	@$(PREFIX)ld build\loader.o -o data\loader.bin --oformat=binary --entry=_start
+	
+build_priiloader:	
 	@echo -----------------------------------------------
 	@echo compiling priiloader...
 	@echo -----------------------------------------------
 	@echo 
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@make --no-print-directory -C build -f $(CURDIR)/Makefile
 
+post_build: 
 #create the .app for the wii
 ifeq ($(UNAME),Linux)
 		@echo

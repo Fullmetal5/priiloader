@@ -68,11 +68,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "certs_bin.h"
 #include "loader_bin.h"
 
-extern "C"
-{
-	extern void _unstub_start(void);
-	extern void __exception_closeall();
-}
 typedef struct {
 	unsigned int offsetText[7];
 	unsigned int offsetData[11];
@@ -97,6 +92,11 @@ typedef struct {
 	u8 HW_AHBPROT_ENABLED;
 	std::vector<std::string> args;
 }Binary_struct;
+
+extern "C"
+{
+	extern void __exception_closeall();
+}
 
 extern DVD_status DVD_state;
 
@@ -188,7 +188,7 @@ void SysHackHashSettings( void )
 				}
 				else
 				{
-					gprintf("no FAT device found\r\n");
+					gprintf("no FAT device found");
 				}
 				if ( ( (GetMountedValue() & 2) && !__io_wiisd.isInserted() ) || ( (GetMountedValue() & 1) && !__io_usbstorage.isInserted() ) )
 				{
@@ -248,7 +248,7 @@ void SysHackHashSettings( void )
 handle_hacks_fail:
 				if(fail > 0)
 				{
-					gprintf("hacks_hash.ini save error %d\r\n",fail);
+					gprintf("hacks_hash.ini save error %d",fail);
 				}
 				
 				s32 fd = ISFS_Open("/title/00000001/00000002/data/hacksh_s.ini", 1|2 );
@@ -286,7 +286,7 @@ handle_hacks_fail:
 handle_hacks_s_fail:
 				if(fail > 0)
 				{
-					gprintf("hacksh_s.ini save error %d\r\n",fail);
+					gprintf("hacksh_s.ini save error %d",fail);
 				}
 
 				if( fail > 0 )
@@ -365,7 +365,7 @@ handle_hacks_s_fail:
 		}
 		if( redraw )
 		{
-			//printf("\x1b[2;0HHackCount:%d DispCount:%d cur_off:%d menu_off:%d Hacks:%d   \r\n", HackCount, DispCount, cur_off, menu_off, system_hacks.size() );
+			//printf("\x1b[2;0HHackCount:%d DispCount:%d cur_off:%d menu_off:%d Hacks:%d   ", HackCount, DispCount, cur_off, menu_off, system_hacks.size() );
 			u32 j=0;
 			u32 skip=menu_off;
 
@@ -883,7 +883,7 @@ void SetSettings( void )
 					PrintFormat( cur_off==1, 0, 128,    "             Return to:          Autoboot   ");
 				break;
 				default:
-					gdprintf("SetSettings : unknown return to value %d\r\n",settings->ReturnTo);
+					gdprintf("SetSettings : unknown return to value %d",settings->ReturnTo);
 					settings->ReturnTo = RETURNTO_PRIILOADER;
 					break;
 			}
@@ -900,7 +900,7 @@ void SetSettings( void )
 					PrintFormat( cur_off==2, 0, 128+(16*1), "           Shutdown to:          Autoboot  ");
 				break;
 				default:
-					gdprintf("SetSettings : unknown shutdown to value %d\r\n",settings->ShutdownTo);
+					gdprintf("SetSettings : unknown shutdown to value %d",settings->ShutdownTo);
 					settings->ShutdownTo = SHUTDOWNTO_NONE;
 					break;
 			}
@@ -951,12 +951,12 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 		//its an elf; lets start killing DVD :')
 		if(DVDCheckCover())
 		{
-			gprintf("BootDolFromMem : excecuting StopDisc Async...\r\n");
+			gprintf("BootDolFromMem : excecuting StopDisc Async...");
 			DVDStopDisc(true);
 		}
 		else
 		{
-			gprintf("BootDolFromMem : Skipping StopDisc -> no drive or disc in drive\r\n");
+			gprintf("BootDolFromMem : Skipping StopDisc -> no drive or disc in drive");
 		}
 
 		//prepare loader
@@ -971,7 +971,7 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 		loader = (void (*)(void*,void*,u32,u8))(loader_addr);
 
 
-		gprintf("BootDolFromMem : shutting down...\r\n");
+		gprintf("BootDolFromMem : shutting down...");
 
 		ClearState();
 		Input_Shutdown();
@@ -979,7 +979,7 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 
 		if(DvdKilled() < 1)
 		{
-			gprintf("checking DVD drive...\r\n");
+			gprintf("checking DVD drive...");
 			while(DvdKilled() < 1);
 		}
 
@@ -1011,7 +1011,7 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 			system_state.ReloadedIOS = 1;
 		}
 		
-		gprintf("IOS state : ios %d - ahbprot : %d \r\n",IOS_GetVersion(),(read32(0x0d800064) == 0xFFFFFFFF ));
+		gprintf("IOS state : ios %d - ahbprot : %d ",IOS_GetVersion(),(read32(0x0d800064) == 0xFFFFFFFF ));
 
 		ISFS_Deinitialize();
 		ShutdownDevices();
@@ -1022,7 +1022,7 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 		__exception_closeall();
 		ICSync();
 
-		gprintf("BootDolFromMem : starting binary...\r\n");	
+		gprintf("BootDolFromMem : starting binary...");	
 		loader(binary,args,args != NULL,0);
 		
 		//alternate booting code. seems to be as good(or bad) as the above code
@@ -1051,17 +1051,17 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 	}
 	catch (const std::string& ex)
 	{
-		gprintf("BootDolFromMem Exception -> %s\r\n",ex.c_str());
+		gprintf("BootDolFromMem Exception -> %s",ex.c_str());
 		ret = -7;
 	}
 	catch (char const* ex)
 	{
-		gprintf("BootDolFromMem Exception -> %s\r\n",ex);
+		gprintf("BootDolFromMem Exception -> %s",ex);
 		ret = -7;
 	}
 	catch(...)
 	{
-		gprintf("BootDolFromMem Exception was thrown\r\n");
+		gprintf("BootDolFromMem Exception was thrown");
 		ret = -7;
 	}
 
@@ -1087,7 +1087,7 @@ s8 BootDolFromFile( const char* Dir , u8 HW_AHBPROT_ENABLED,const std::vector<st
 
 		std::string _path;
 		_path.append(Dir);
-		gprintf("going to boot %s\r\n",_path.c_str());
+		gprintf("going to boot %s",_path.c_str());
 
 		struct __argv* args = (struct __argv*)mem_align(32,sizeof(__argv));
 		if(!args)
@@ -1147,7 +1147,7 @@ s8 BootDolFromFile( const char* Dir , u8 HW_AHBPROT_ENABLED,const std::vector<st
 		}
 		dol = fopen(Dir,"rb");	
 		if(!dol)
-			throw "failed to open file\r\n";
+			throw "failed to open file";
 
 		fseek( dol, 0, SEEK_END );
 		u32 size = ftell(dol);
@@ -1167,17 +1167,17 @@ s8 BootDolFromFile( const char* Dir , u8 HW_AHBPROT_ENABLED,const std::vector<st
 	}
 	catch (const std::string& ex)
 	{
-		gprintf("BootDolFromFile Exception -> %s\r\n",ex.c_str());
+		gprintf("BootDolFromFile Exception -> %s",ex.c_str());
 		ret = -7;
 	}
 	catch (char const* ex)
 	{
-		gprintf("BootDolFromFile Exception -> %s\r\n",ex);
+		gprintf("BootDolFromFile Exception -> %s",ex);
 		ret = -7;
 	}
 	catch(...)
 	{
-		gprintf("BootDolFromFile Exception was thrown\r\n");
+		gprintf("BootDolFromFile Exception was thrown");
 		ret = -7;
 	}
 	if(dol)
@@ -1193,6 +1193,60 @@ s8 BootDolFromFile( const char* Dir , u8 HW_AHBPROT_ENABLED,const std::vector<st
 }
 void BootMainSysMenu( u8 init )
 {
+	//Experimental offset/patch code to be used with the newly created loader
+	/*struct offset_patch {
+		u32 offset;
+		u32 patch_size;
+		u8 patch[];
+	};//ATTRIBUTE_ALIGN(32);
+
+	//gprintf("sizeof : 0x%08X & 0x%08X",sizeof(offset_patch),sizeof(u32));
+	//offset_patch *_patches = (offset_patch*)mem_align(32,(sizeof(offset_patch)+8)*10);
+	//memset(_patches,0,(sizeof(offset_patch)+8)*10);
+	//gprintf("memory loc vec : 0x%08X",_patches);
+	//offset_patch *patches = _patches;
+
+	std::vector<offset_patch> _patches;
+	offset_patch _patch;
+	_patch.offset = 0x80818283;
+	_patch.patch_size = 6;
+	_patch.patch[0] = 0x84;
+	_patch.patch[1] = 0x85;
+	_patch.patch[2] = 0x86;
+	_patch.patch[3] = 0x87;
+	_patch.patch[4] = 0x88;
+	_patch.patch[5] = 0x89;
+	_patches.push_back(_patch);
+
+	_patch.offset = 0x92939495;
+	_patch.patch_size = 8;
+	_patch.patch[0] = 0x96;
+	_patch.patch[1] = 0x97;
+	_patch.patch[2] = 0x98;
+	_patch.patch[3] = 0x99;
+	_patch.patch[4] = 0x10;
+	_patch.patch[5] = 0x11;
+	_patch.patch[6] = 0x12;
+	_patch.patch[7] = 0x13;
+	_patches.push_back(_patch);
+
+	gprintf("size : %d starting at 0x%08X",_patches.size(),&_patches[0]);
+	gprintf("size : %d starting at 0x%08X",_patches.size(),&_patches[1]);
+	offset_patch *patch = &_patches[0];
+	for(int i = 0;i < 3;)
+	{	gprintf("patch %d - 0x%08X",i,patch);
+		gprintf("offset  : 0x%08X",patch->offset);
+		gprintf("patch_size  : 0x%08X",patch->patch_size);
+		gprintf("patch pointing to : 0x%08X",(vu32*)patch->patch);
+		gprintf("patch2 pointing to : 0x%08X",(vu32*)(patch->patch+4));
+		gprintf("patch  : 0x%08X",*patch->patch);
+		gprintf("patch2  : 0x%08X",*(vu32*)(patch->patch+4));
+		i++;
+		patch = (offset_patch *)((((8 + patch->patch_size) + 4) & ~4) + (u32)patch);
+	}
+	gprintf("loldone\n");
+	return;*/
+
 	//TMD
 	const u64 TitleID=0x0000000100000002LL;
 	u32 tmd_size;
@@ -1239,21 +1293,21 @@ void BootMainSysMenu( u8 init )
 		}
 
 		rTMD = (tmd_view *)tmd_buf;
-		gdprintf("ios version: %u\r\n",(u8)rTMD->sys_version);
+		gdprintf("ios version: %u",(u8)rTMD->sys_version);
 
 		//get main.dol filename
 		/*for(u32 z=0; z < rTMD->num_contents; ++z)
 		{
 			if( rTMD->contents[z].index == rTMD->num_contents )//rTMD->boot_index )
 			{
-				gdprintf("content[%i] id=%08X type=%u\r\n", z, content->cid, content->type | 0x8001 );
+				gdprintf("content[%i] id=%08X type=%u", z, content->cid, content->type | 0x8001 );
 				fileID = rTMD->contents[z].cid;
 				break;
 			}
 		}*/
 
 		fileID = rTMD->contents[rTMD->num_contents-1].cid;
-		gprintf("using %08X for booting\r\n",rTMD->contents[rTMD->num_contents-1].cid);
+		gprintf("using %08X for booting",rTMD->contents[rTMD->num_contents-1].cid);
 
 		if( fileID == 0 )
 		{
@@ -1278,7 +1332,7 @@ void BootMainSysMenu( u8 init )
 		if( ret < 0 || status->file_length == 0)
 		{
 			error = ERROR_SYSMENU_BOOTGETSTATS;
-			throw "retrieving bootfile stats failed\r\n";
+			throw "retrieving bootfile stats failed";
 		}
 		bootfile_size = status->file_length;
 
@@ -1296,7 +1350,7 @@ void BootMainSysMenu( u8 init )
 		}
 		ISFS_Close(fd);
 
-		gprintf("loading hacks\r\n");
+		gprintf("loading hacks");
 		LoadSystemHacks(true);
 
 		Input_Shutdown();
@@ -1327,14 +1381,14 @@ void BootMainSysMenu( u8 init )
 		//technically if we want to use sys menu IOS but its not loaded we need to reload, but i fail to see why
 		else if ((u8)IOS_GetVersion() != (u8)rTMD->sys_version)
 		{
-			gprintf("Use system menu is ON, but IOS %d isn't loaded. reloading IOS...\r\n",(u8)rTMD->sys_version);
+			gprintf("Use system menu is ON, but IOS %d isn't loaded. reloading IOS...",(u8)rTMD->sys_version);
 			__ES_Close();
 			__IOS_ShutdownSubsystems();
 			__ES_Init();
 			__IOS_LaunchNewIOS ( (u8)rTMD->sys_version );
 			__ES_Init();
 
-			gprintf("launched ios %d for system menu\r\n",IOS_GetVersion());
+			gprintf("launched ios %d for system menu",IOS_GetVersion());
 			system_state.ReloadedIOS = 1;
 		}*/
 
@@ -1342,9 +1396,9 @@ void BootMainSysMenu( u8 init )
 		if (((u8)IOS_GetVersion() != (u8)rTMD->sys_version) || (system_state.ReloadedIOS) )
 		{
 			if (system_state.ReloadedIOS)
-				gprintf("Forced into ES_Identify\r\n");
+				gprintf("Forced into ES_Identify");
 			else
-				gprintf("Forcing ES_Identify\r\n");
+				gprintf("Forcing ES_Identify");
 
 			//read ticket from FS
 			fd = ISFS_Open("/title/00000001/00000002/content/ticket", 1 );
@@ -1405,7 +1459,8 @@ void BootMainSysMenu( u8 init )
 				__IOS_InitializeSubsystems();
 				throw "ES_Identify: GetStoredTMD error " + std::to_string(ret);
 			}
-			//ret = ES_Identify( (signed_blob *)certs_bin, certs_bin_size, (signed_blob *)TMD, tmd_size_temp, (signed_blob *)ticket, status->file_length, 0);
+			//uncomment me
+			ret = ES_Identify( (signed_blob *)certs_bin, certs_bin_size, (signed_blob *)TMD, tmd_size_temp, (signed_blob *)ticket, status->file_length, 0);
 			if( ret < 0 )
 			{	
 				error=ERROR_SYSMENU_ESDIVERFIY_FAILED;
@@ -1420,93 +1475,37 @@ void BootMainSysMenu( u8 init )
 
 		//ES_SetUID(TitleID);
 
-		*(vu32*)0x800000F8 = 0x0E7BE2C0;				// Bus Clock Speed
-		*(vu32*)0x800000FC = 0x2B73A840;				// CPU Clock Speed
-		*(vu32*)0x8000315C = 0x80800113;				// DI Legacy mode ?
-		DCFlushRange((void*)0x80000000,0x3400);
-
-		gprintf("Hacks:%d\r\n",system_hacks.size());
+		gprintf("Hacks:%d",system_hacks.size());
 		mem_block = (u8*)binary;
 		max_address = (u32)(mem_block + bootfile_size);
-		/*
-		Experimental offset/patch code to be used with the newly created loader
-		struct offset_patch {
-			u32 offset;
-			u32 patch_size;
-			u8 patch[];
-		}ATTRIBUTE_ALIGN(32);
-
-		gprintf("sizeof : 0x%08X & 0x%08X\r\n",sizeof(offset_patch),sizeof(u32));
-		offset_patch *_patches = (offset_patch*)mem_align(32,(sizeof(offset_patch)+8)*10);
-		memset(_patches,0,(sizeof(offset_patch)+8)*10);
-		gprintf("memory loc vec : 0x%08X\r\n",_patches);
-
-		offset_patch *patches = _patches;
-
-		patches[0].offset = 0x80818283;
-		patches[0].patch_size = 6;
-		patches[0].patch[0] = 0x84;
-		patches[0].patch[1] = 0x85;
-		patches[0].patch[2] = 0x86;
-		patches[0].patch[3] = 0x87;
-		patches[0].patch[4] = 0x88;
-		patches[0].patch[5] = 0x89;
-		//patches[0].patch[6] = 0x90;
-		//patches[0].patch[7] = 0x91;
-
-		//#define ALIGN4(x) (((x) + 4) & ~4)
-		patches = (offset_patch *) ((((8 + patches[0].patch_size) + 4) & ~4) + (u32)patches);
-
-		patches[0].offset = 0x92939495;
-		patches[0].patch_size = 8;
-		patches[0].patch[0] = 0x96;
-		patches[0].patch[1] = 0x97;
-		patches[0].patch[2] = 0x98;
-		patches[0].patch[3] = 0x99;
-		patches[0].patch[4] = 0x10;
-		patches[0].patch[5] = 0x11;
-		patches[0].patch[6] = 0x12;
-		patches[0].patch[7] = 0x13;
-		DCFlushRange((void*)_patches, (sizeof(offset_patch)+8)*10);
-		ICInvalidateRange((void*)_patches, (sizeof(offset_patch)+8)*10);
-
-		offset_patch *patch = _patches;
-		for(int i = 0;i < 3;)
-		{	gprintf("patch %d - 0x%08X\r\n",i,patch);
-			gprintf("offset  : 0x%08X\r\n",patch->offset);
-			gprintf("patch_size  : 0x%08X\r\n",patch->patch_size);
-			gprintf("patch pointing to : 0x%08X\r\n",(vu32*)patch->patch);
-			gprintf("patch2 pointing to : 0x%08X\r\n",(vu32*)(patch->patch+4));
-			gprintf("patch  : 0x%08X\r\n",*(vu32*)patch->patch);
-			gprintf("patch2  : 0x%08X\r\n",*(vu32*)(patch->patch+4));
-			i++;
-			patch = (offset_patch *)((((8 + patch->patch_size) + 4) & ~4) + (u32)patch);
-		}
-
-		mem_free(_patches);
-		return;*/
-		/*for(u32 i = 0;i < system_hacks.size();i++)
+		
+		for(u32 i = 0;i < system_hacks.size();i++)
 		{
-			gprintf("testing %s\r\n",system_hacks[i].desc.c_str());
+			//gprintf("testing %s",system_hacks[i].desc.c_str());
 			if(states_hash[i] != 1)
 				continue;
 
-			gprintf("applying %s\r\n",system_hacks[i].desc.c_str());
+			gprintf("applying %s",system_hacks[i].desc.c_str());
 			u32 add = 0;
+			u32 offsetSize = 0;
 			for(u32 y = 0; y < system_hacks[i].patches.size();y++)
 			{
 				if(system_hacks[i].patches[y].patch.size() <= 0)
 					continue;
 
-				//offset method
+				//offset method				
 				if(system_hacks[i].patches[y].offset > 0)
 				{
-					u8* addr = (u8*)(system_hacks[i].patches[y].offset);
-					for(u32 z = 0;z < system_hacks[i].patches[y].patch.size(); z++)
+					offsetSize += system_hacks[i].patches[y].patch.size();
+					//u8* addr = (u8*)(system_hacks[i].patches[y].offset);
+
+					/*for(u32 z = 0;z < system_hacks[i].patches[y].patch.size(); z++)
 					{
-						addr[z] = system_hacks[i].patches[y].patch[z];
-						DCFlushRange(addr, 4);
-					}
+						//addr[z] = system_hacks[i].patches[y].patch[z];
+						//DCFlushRange(addr, 4);
+					}*/
+
+					continue;
 				}
 				//hash method
 				else if(system_hacks[i].patches[y].hash.size() > 0)
@@ -1518,7 +1517,7 @@ void BootMainSysMenu( u8 init )
 						std::copy(system_hacks[i].patches[y].hash.begin(),system_hacks[i].patches[y].hash.end(),temp_hash);
 						if ( !memcmp(mem_block+add, temp_hash ,sizeof(temp_hash)) )
 						{
-							gprintf("Found %s @ 0x%X, patching hash # %d...\r\n",system_hacks[i].desc.c_str(), add+(u32)mem_block, y+1);
+							gprintf("Found %s @ 0x%X, patching hash # %d...",system_hacks[i].desc.c_str(), add, y+1);
 							std::copy(system_hacks[i].patches[y].patch.begin(),
 								system_hacks[i].patches[y].patch.end(),
 								temp_patch);
@@ -1550,26 +1549,30 @@ void BootMainSysMenu( u8 init )
 		__STM_Close();
 		__IPC_Reinitialize();
 		__IOS_ShutdownSubsystems();
+		__exception_closeall();
+		gprintf("launching sys menu...");
 		
 		//loader
 		loader(binary,NULL,0,1);
 
-		ICSync();
-		_unstub_start();
+		//oh ow, this ain't good
+		__IOS_InitializeSubsystems();
+		PollDevices();
+		gprintf("this ain't good");	
+		ISFS_Initialize();
 		Input_Init();
-
 	}
 	catch (const std::string& ex)
 	{
-		gprintf("BootMainSysMenu Exception -> %s\r\n",ex.c_str());
+		gprintf("BootMainSysMenu Exception -> %s",ex.c_str());
 	}
 	catch (char const* ex)
 	{
-		gprintf("BootMainSysMenu Exception -> %s\r\n",ex);
+		gprintf("BootMainSysMenu Exception -> %s",ex);
 	}
 	catch(...)
 	{
-		gprintf("BootMainSysMenu Exception was thrown\r\n");
+		gprintf("BootMainSysMenu Exception was thrown");
 	}
 
 	if(ticket)
@@ -1619,7 +1622,7 @@ void InstallLoadDOL( void )
 		}
 		if(reload)
 		{
-			gprintf("loading binaries...\r\n");
+			gprintf("loading binaries...");
 			DevStat = GetMountedValue();
 			reload = 0;
 			dir = opendir ("fat:/apps/");
@@ -1653,7 +1656,7 @@ void InstallLoadDOL( void )
 					app_bin = fopen(filepath,"rb");
 					if(!app_bin)
 					{
-						gdprintf("failed to open meta.xml of %s\r\n",filename);
+						gdprintf("failed to open meta.xml of %s",filename);
 						temp.app_name = filename;
 						app_list.push_back(temp);
 						continue;
@@ -1667,7 +1670,7 @@ void InstallLoadDOL( void )
 					buf = (char*)mem_malloc(size+1);
 					if(!buf)
 					{
-						gdprintf("buf == NULL\r\n");
+						gdprintf("buf == NULL");
 						fclose(app_bin);
 						temp.app_name = filename;
 						app_list.push_back(temp);
@@ -1681,7 +1684,7 @@ void InstallLoadDOL( void )
 						fclose(app_bin);
 						temp.app_name = filename;
 						app_list.push_back(temp);
-						gdprintf("failed to read data error %d\r\n",ret);
+						gdprintf("failed to read data error %d",ret);
 					}
 					else
 					{
@@ -1741,7 +1744,7 @@ void InstallLoadDOL( void )
 					}
 					if(temp.app_name.size())
 					{
-						gdprintf("added %s to list\r\n",temp.app_name.c_str());
+						gdprintf("added %s to list",temp.app_name.c_str());
 						app_list.push_back(temp);
 						continue;
 					}
@@ -1749,7 +1752,7 @@ void InstallLoadDOL( void )
 					{
 						temp.app_name = filename;
 						app_list.push_back(temp);
-						gdprintf("no name found in xml D:<\r\n");
+						gdprintf("no name found in xml D:<");
 						continue;
 					}
 				}
@@ -1757,12 +1760,12 @@ void InstallLoadDOL( void )
 			}
 			else
 			{
-				gprintf("WARNING: could not open fat:/apps/ for binaries\r\n");
+				gprintf("WARNING: could not open fat:/apps/ for binaries");
 			}
 			dir = opendir ("fat:/");
 			if(dir == NULL)
 			{
-				gprintf("WARNING: could not open fat:/ for binaries\r\n");
+				gprintf("WARNING: could not open fat:/ for binaries");
 			}
 			else
 			{
@@ -1789,13 +1792,13 @@ void InstallLoadDOL( void )
 			{
 				if((GetMountedValue() & 2) && ToggleUSBOnlyMode() == 1)
 				{
-					gprintf("switching to USB only...also mounted == %d\r\n",GetMountedValue());
+					gprintf("switching to USB only...also mounted == %d",GetMountedValue());
 					reload = 1;
 					continue;
 				}
 				if(GetUsbOnlyMode() == 1)
 				{
-					gprintf("fixing usbonly mode...\r\n");
+					gprintf("fixing usbonly mode...");
 					ToggleUSBOnlyMode();
 				}
 				PrintFormat( 1, TEXT_OFFSET("Couldn't find any executable files"), 208, "Couldn't find any executable files");
@@ -1910,7 +1913,7 @@ void InstallLoadDOL( void )
 				if( ISFS_Write( fd, buf, sizeof( char ) * size ) != (signed)(sizeof( char ) * size) )
 				{
 					PrintFormat( 1, TEXT_OFFSET("Writing dol failed!"), 240, "Writing dol failed!");
-					gprintf("writing dol failure! error %d ( 0x%08X )\r\n",fd);
+					gprintf("writing dol failure! error %d ( 0x%08X )",fd);
 				}
 				else
 				{
@@ -2024,7 +2027,7 @@ void InstallLoadDOL( void )
 			ClearScreen();
 			PrintFormat( 1, TEXT_OFFSET("Loading binary..."), 208, "Loading binary...");	
 			ret = BootDolFromFile(app_list[cur_off].app_path.c_str(),app_list[cur_off].HW_AHBPROT_ENABLED,app_list[cur_off].args);
-			gprintf("loading %s ret %d\r\n",app_list[cur_off].app_path.c_str(),ret);
+			gprintf("loading %s ret %d",app_list[cur_off].app_path.c_str(),ret);
 			PrintFormat( 1, TEXT_OFFSET("failed to load binary"), 224, "failed to load binary");
 			sleep(3);
 			ClearScreen();
@@ -2164,15 +2167,15 @@ void AutoBootDol( void )
 		}
 		catch (const std::string& ex)
 		{
-			gprintf("AutoBootDol Exception -> %s\r\n",ex.c_str());
+			gprintf("AutoBootDol Exception -> %s",ex.c_str());
 		}
 		catch (char const* ex)
 		{
-			gprintf("AutoBootDol Exception -> %s\r\n",ex);
+			gprintf("AutoBootDol Exception -> %s",ex);
 		}
 		catch(...)
 		{
-			gprintf("AutoBootDol Exception was thrown\r\n");
+			gprintf("AutoBootDol Exception was thrown");
 		}
 
 		if(fd > 0)
@@ -2224,15 +2227,15 @@ void AutoBootDol( void )
 	}
 	catch (const std::string& ex)
 	{
-		gprintf("AutoBootDol Exception -> %s\r\n",ex.c_str());
+		gprintf("AutoBootDol Exception -> %s",ex.c_str());
 	}
 	catch (char const* ex)
 	{
-		gprintf("AutoBootDol Exception -> %s\r\n",ex);
+		gprintf("AutoBootDol Exception -> %s",ex);
 	}
 	catch(...)
 	{
-		gprintf("AutoBootDol Exception was thrown\r\n");
+		gprintf("AutoBootDol Exception was thrown");
 	}
 
 	if(binary)
@@ -2273,19 +2276,19 @@ void CheckForUpdate()
 		if (file_size < 0 && file_size > -4)
 		{
 			//errors connecting to server
-			gprintf("connection failure. error %d\r\n",file_size);
+			gprintf("connection failure. error %d",file_size);
 		}
 		else if (file_size == -7)
 		{
-			gprintf("CheckForUpdate : HTTP Error %s!\r\n",Get_Last_reply());
+			gprintf("CheckForUpdate : HTTP Error %s!",Get_Last_reply());
 		}
 		else if ( file_size < 0 )
 		{
-			gprintf("CheckForUpdate : GetHTTPFile error %d\r\n",file_size);
+			gprintf("CheckForUpdate : GetHTTPFile error %d",file_size);
 		}
 		else if (file_size != (s32)sizeof(UpdateStruct))
 		{
-			gprintf("CheckForUpdate : file_size != UpdateStruct\r\n");
+			gprintf("CheckForUpdate : file_size != UpdateStruct");
 		}
 		sleep(5);
 		mem_free(buffer);
@@ -2431,7 +2434,7 @@ void CheckForUpdate()
 	}
 //Download changelog and ask to proceed or not
 //------------------------------------------------------
-	gprintf("downloading changelog...\r\n");
+	gprintf("downloading changelog...");
 	if(DownloadedBeta)
 	{
 		file_size = GetHTTPFile("www.dacotaco.com","/priiloader/changelog_beta.txt",Changelog,0);
@@ -2534,12 +2537,12 @@ void CheckForUpdate()
 	{
 		if(file_size < -9)
 			mem_free(Changelog);
-		gprintf("CheckForUpdate : failed to get changelog.error %d, HTTP reply %s\r\n",file_size,Get_Last_reply());
+		gprintf("CheckForUpdate : failed to get changelog.error %d, HTTP reply %s",file_size,Get_Last_reply());
 	}
 //The choice is made. lets download what the user wanted :)
 //--------------------------------------------------------------
 	ClearScreen();
-	gprintf("downloading %s\r\n",DownloadedBeta?"beta":"update");
+	gprintf("downloading %s",DownloadedBeta?"beta":"update");
 	if(DownloadedBeta)
 	{
 		PrintFormat( 1, TEXT_OFFSET("downloading   .   beta   ..."), 208, "downloading %d.%d beta %d...",UpdateFile.beta_version >> 8,UpdateFile.beta_version&0xFF, UpdateFile.beta_number);
@@ -2557,17 +2560,17 @@ void CheckForUpdate()
 		if (file_size < 0 && file_size > -4)
 		{
 			//errors connecting to server
-			gprintf("connection failure: error %d\r\n",file_size);
+			gprintf("connection failure: error %d",file_size);
 		}
 		else if (file_size == -7)
 		{
-			gprintf("HTTP Error %s!\r\n",Get_Last_reply());
+			gprintf("HTTP Error %s!",Get_Last_reply());
 		}
 		else
 		{
 			if(file_size < -9)
 				mem_free(Data);
-			gprintf("getting update error %d\r\n",file_size);
+			gprintf("getting update error %d",file_size);
 		}
 		PrintFormat( 1, TEXT_OFFSET("error getting file from server"), 224, "error getting file from server");
 		sleep(2);
@@ -2581,11 +2584,11 @@ void CheckForUpdate()
 		sha.Input(Data,file_size);
 		if (!sha.Result(FileHash))
 		{
-			gprintf("sha: could not compute Hash of Update!\r\nHash : 00 00 00 00 00\r\n");
+			gprintf("sha: could not compute Hash of Update!\r\nHash : 00 00 00 00 00");
 		}
 		else
 		{
-			gprintf( "Downloaded Update : %08X %08X %08X %08X %08X\r\n",
+			gprintf( "Downloaded Update : %08X %08X %08X %08X %08X",
 			FileHash[0],
 			FileHash[1],
 			FileHash[2],
@@ -2595,7 +2598,7 @@ void CheckForUpdate()
 		gprintf("Online : ");
 		if (!DownloadedBeta)
 		{
-			gprintf("%08X %08X %08X %08X %08X\r\n"
+			gprintf("%08X %08X %08X %08X %08X"
 					,UpdateFile.SHA1_Hash[0]
 					,UpdateFile.SHA1_Hash[1]
 					,UpdateFile.SHA1_Hash[2]
@@ -2604,7 +2607,7 @@ void CheckForUpdate()
 		}
 		else
 		{
-			gprintf("%08X %08X %08X %08X %08X\r\n"
+			gprintf("%08X %08X %08X %08X %08X"
 					,UpdateFile.beta_SHA1_Hash[0]
 					,UpdateFile.beta_SHA1_Hash[1]
 					,UpdateFile.beta_SHA1_Hash[2]
@@ -2627,11 +2630,11 @@ void CheckForUpdate()
 			UpdateFile.beta_SHA1_Hash[3] == FileHash[3] &&
 			UpdateFile.beta_SHA1_Hash[4] == FileHash[4] ) ) )
 		{
-			gprintf("Hash check complete. booting file...\r\n");
+			gprintf("Hash check complete. booting file...");
 		}
 		else
 		{
-			gprintf("File not the same : hash check failure!\r\n");
+			gprintf("File not the same : hash check failure!");
 			PrintFormat( 1, TEXT_OFFSET("Error Downloading Update"), 224, "Error Downloading Update");
 			sleep(5);
 			mem_free(Data);
@@ -2674,20 +2677,20 @@ void Autoboot_System( void )
 	switch( SGetSetting(SETTING_AUTBOOT) )
 	{
 		case AUTOBOOT_SYS:
-			gprintf("AutoBoot:System Menu\r\n");
+			gprintf("AutoBoot:System Menu");
 			BootMainSysMenu(0);
 			break;
 		case AUTOBOOT_HBC:
-			gprintf("AutoBoot:Homebrew Channel\r\n");
+			gprintf("AutoBoot:Homebrew Channel");
 			LoadHBC();
 			break;
 		case AUTOBOOT_BOOTMII_IOS:
-			gprintf("AutoBoot:BootMii IOS\r\n");
+			gprintf("AutoBoot:BootMii IOS");
 			LoadBootMii();
 			error=ERROR_BOOT_BOOTMII;
 			break;
 		case AUTOBOOT_FILE:
-			gprintf("AutoBoot:Installed File\r\n");
+			gprintf("AutoBoot:Installed File");
 			AutoBootDol();
 			break;
 		case AUTOBOOT_ERROR:
@@ -2729,10 +2732,10 @@ int main(int argc, char **argv)
 #ifdef DEBUG
 	InitGDBDebug();
 #endif
-	gprintf("priiloader\r\n");
-	gprintf("Built   : %s %s\r\n", __DATE__, __TIME__ );
-	gprintf("Version : %d.%d.%d (rev %s)\r\n", VERSION>>8, (VERSION&0xFF) / 10,(VERSION&0xFF) % 10,GIT_REV_STR);//VERSION>>16, VERSION&0xFFFF, SVN_REV_STR);
-	gprintf("Firmware: %d.%d.%d\r\n", *(vu16*)0x80003140, *(vu8*)0x80003142, *(vu8*)0x80003143 );
+	gprintf("priiloader");
+	gprintf("Built   : %s %s", __DATE__, __TIME__ );
+	gprintf("Version : %d.%d.%d (rev %s)", VERSION>>8, (VERSION&0xFF) / 10,(VERSION&0xFF) % 10,GIT_REV_STR);//VERSION>>16, VERSION&0xFFFF, SVN_REV_STR);
+	gprintf("Firmware: %d.%d.%d", *(vu16*)0x80003140, *(vu8*)0x80003142, *(vu8*)0x80003143 );
 
 	/**(vu32*)0x80000020 = 0x0D15EA5E;				// Magic word (how did the console boot?)
 	*(vu32*)0x800000F8 = 0x0E7BE2C0;				// Bus Clock Speed
@@ -2759,7 +2762,7 @@ int main(int argc, char **argv)
 
 	AddMem2Area (14*1024*1024, OTHER_AREA);
 	LoadHBCStub();
-	gprintf("\"Magic Priiloader word\": %x - %x\r\n",*(vu32*)MAGIC_WORD_ADDRESS_2 ,*(vu32*)MAGIC_WORD_ADDRESS_1);
+	gprintf("\"Magic Priiloader word\": %x - %x",*(vu32*)MAGIC_WORD_ADDRESS_2 ,*(vu32*)MAGIC_WORD_ADDRESS_1);
 	LoadSettings();
 	if(SGetSetting(SETTING_DUMPGECKOTEXT) == 1)
 	{
@@ -2768,11 +2771,11 @@ int main(int argc, char **argv)
 
 	SetDumpDebug(SGetSetting(SETTING_DUMPGECKOTEXT));
 	s16 Bootstate = CheckBootState();
-	gprintf("BootState:%d\r\n", Bootstate );
+	gprintf("BootState:%d", Bootstate );
 	memset(&system_state,0,sizeof(wii_state));
 	StateFlags flags;
 	flags = GetStateFlags();
-	gprintf("Bootstate %u detected. DiscState %u ,ReturnTo %u & Flags %u & checksum %u\r\n",flags.type,flags.discstate,flags.returnto,flags.flags,flags.checksum);
+	gprintf("Bootstate %u detected. DiscState %u ,ReturnTo %u & Flags %u & checksum %u",flags.type,flags.discstate,flags.returnto,flags.flags,flags.checksum);
 	s8 magicWord = CheckMagicWords();
 	//Check reset button state
 	if( (((*(vu32*)0xCC003000)>>16)&1) == 1 && magicWord == 0) //if( ((*(vu32*)0xCC003000)>>16)&1 && !CheckMagicWords())
@@ -2782,13 +2785,13 @@ int main(int argc, char **argv)
 		{
 			case TYPE_UNKNOWN: //255 or -1, only seen when shutting down from MIOS or booting dol from HBC. it is actually an invalid value
 				flags = GetStateFlags();
-				gprintf("Bootstate %u detected. DiscState %u ,ReturnTo %u & Flags %u\r\n",flags.type,flags.discstate,flags.returnto,flags.flags);
+				gprintf("Bootstate %u detected. DiscState %u ,ReturnTo %u & Flags %u",flags.type,flags.discstate,flags.returnto,flags.flags);
 				if( flags.flags == 130 ) //&& temp.discstate != 2)
 				{
 					//if the flag is 130, its probably shutdown from mios. in that case system menu 
 					//will handle it perfectly (and i quote from SM's OSreport : "Shutdown system from GC!")
 					//it seems to reboot into bootstate 5. but its safer to let SM handle it
-					gprintf("255:System Menu\r\n");
+					gprintf("255:System Menu");
 					BootMainSysMenu(0);
 				}
 				else
@@ -2803,17 +2806,17 @@ int main(int argc, char **argv)
 				//its not fully confirmed system menu does it(or ios while being standby) and if system menu does indeed clear it.
 				/*if(VerifyNandBootInfo())
 				{
-					gprintf("Verifty of NandBootInfo : 1\nbootstate changed to %d\r\n",CheckBootState());
+					gprintf("Verifty of NandBootInfo : 1\nbootstate changed to %d",CheckBootState());
 				}
 				else
 				{
-					gprintf("Verifty of NandBootInfo : 0\r\n");
+					gprintf("Verifty of NandBootInfo : 0");
 				}*/
 				if(SGetSetting(SETTING_SHUTDOWNTO) == SHUTDOWNTO_AUTOBOOT)
 				{
 					//a function asked for by Abraham Anderson. i understood his issue (emulators being easy to shutdown but not return to loader, making him want to shutdown to loader) 
 					//but still think its stupid. however, days of the wii are passed and i hope no idiot is going to screw his wii with this and then nag to me...
-					gprintf("booting autoboot instead of shutting down...\r\n");
+					gprintf("booting autoboot instead of shutting down...");
 					Autoboot_System();
 				}
 				else if(SGetSetting(SETTING_SHUTDOWNTO) == SHUTDOWNTO_NONE)
@@ -2852,7 +2855,7 @@ int main(int argc, char **argv)
 				switch( SGetSetting(SETTING_RETURNTO) )
 				{
 					case RETURNTO_SYSMENU:
-						gprintf("ReturnTo:System Menu\r\n");
+						gprintf("ReturnTo:System Menu");
 						BootMainSysMenu(0);
 					break;
 
@@ -2875,7 +2878,7 @@ int main(int argc, char **argv)
 				if( ClearState() < 0 )
 				{
 					error = ERROR_STATE_CLEAR;
-					gprintf("ClearState failure\r\n");
+					gprintf("ClearState failure");
 				}
 				break;
 
@@ -2885,24 +2888,24 @@ int main(int argc, char **argv)
 	//Plan B address : 0x93FFFFFA
 	if(magicWord == MAGIC_WORD_DACO)
  	{
-		gprintf("\"Magic Priiloader Word\" 'Daco' found!\r\n");
-		gprintf("clearing memory of the \"Magic Priiloader Word\"\r\n");
+		gprintf("\"Magic Priiloader Word\" 'Daco' found!");
+		gprintf("clearing memory of the \"Magic Priiloader Word\"");
 		ClearMagicWord();
 		
 	}
 	else if(magicWord == MAGIC_WORD_PUNE)
 	{
 		//detected the force for sys menu
-		gprintf("\"Magic Priiloader Word\" 'Pune' found!\r\n");
-		gprintf("clearing memory of the \"Magic Priiloader Word\" and starting system menu...\r\n");
+		gprintf("\"Magic Priiloader Word\" 'Pune' found!");
+		gprintf("clearing memory of the \"Magic Priiloader Word\" and starting system menu...");
 		ClearMagicWord();
 		BootMainSysMenu(0);
 	}
 	else if( magicWord == MAGIC_WORD_ABRA )
 	{
 		//detected the force for autoboot
-		gprintf("\"Magic Priiloader Word\" 'Abra' found!\r\n");
-		gprintf("clearing memory of the \"Magic Priiloader Word\" and starting Autorun setting...\r\n");
+		gprintf("\"Magic Priiloader Word\" 'Abra' found!");
+		gprintf("clearing memory of the \"Magic Priiloader Word\" and starting Autorun setting...");
 		ClearMagicWord();
 		Autoboot_System();
 	}
@@ -2912,7 +2915,7 @@ int main(int argc, char **argv)
 		 || ( SGetSetting(SETTING_SHUTDOWNTO) == SHUTDOWNTO_NONE && Bootstate == 5 ) ) 
 		 && error == 0 )
 	{
-		gprintf("Reset Button is held down\r\n");
+		gprintf("Reset Button is held down");
 	}
 
 	//init video first so we can see crashes :)
@@ -2921,10 +2924,10 @@ int main(int argc, char **argv)
  		password_check();
 
 	r = (s32)PollDevices();
-	gprintf("FAT_Init():%d\r\n", r );
+	gprintf("FAT_Init():%d", r );
 
 	r = Input_Init();
-	gprintf("Input_Init():%d\r\n", r );
+	gprintf("Input_Init():%d", r );
 
 	WPAD_SetPowerButtonCallback(HandleWiiMoteEvent);
 
@@ -2940,14 +2943,14 @@ int main(int argc, char **argv)
 	}
 	_sync();
 #ifdef DEBUG
-	gdprintf("priiloader v%d.%d DEBUG (Sys:%d)(IOS:%d)(%s %s)\r\n", VERSION>>8, VERSION&0xFF, SysVersion, (*(vu32*)0x80003140)>>16, __DATE__, __TIME__);
+	gdprintf("priiloader v%d.%d DEBUG (Sys:%d)(IOS:%d)(%s %s)", VERSION>>8, VERSION&0xFF, SysVersion, (*(vu32*)0x80003140)>>16, __DATE__, __TIME__);
 #else
 	#if BETAVERSION > 0
-		gprintf("priiloader v%d.%d BETA %d (Sys:%d)(IOS:%d)(%s %s)\r\n", VERSION>>8, VERSION&0xFF,BETAVERSION,SysVersion, (*(vu32*)0x80003140)>>16, __DATE__, __TIME__);
+		gprintf("priiloader v%d.%d BETA %d (Sys:%d)(IOS:%d)(%s %s)", VERSION>>8, VERSION&0xFF,BETAVERSION,SysVersion, (*(vu32*)0x80003140)>>16, __DATE__, __TIME__);
 	#endif
 #endif
 	system_state.InMainMenu = 1;
-	//gprintf("ptr : 0x%08X data of ptr : 0x%08X size : %d\r\n",&system_state,*((u32*)&system_state),sizeof(system_state));
+	//gprintf("ptr : 0x%08X data of ptr : 0x%08X size : %d",&system_state,*((u32*)&system_state),sizeof(system_state));
 	while(1)
 	{
 		Input_ScanPads();
