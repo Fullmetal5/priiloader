@@ -1,8 +1,8 @@
 /*
 
-priiloader/preloader 0.30 - A tool which allows to change the default boot up sequence on the Wii console
+priiloader - A tool which allows to change the default boot up sequence on the Wii console
 
-Copyright (C) 2008-2019  crediar
+Copyright (C) 2008-2019  DacoTaco
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -535,8 +535,6 @@ s8 LoadSystemHacks(bool load_nand)
 				mem_free(fbuf);
 				return 0;
 			}
-			ISFS_Close( nand_file_handler );
-			nand_file_handler = -1;
 
 			for(u32 i = 0;i < status->file_length;i++)
 			{
@@ -544,6 +542,16 @@ s8 LoadSystemHacks(bool load_nand)
 			}		
 
 			mem_free(fbuf);
+
+			//Set all system_hacks for system menu > max_version || sysver < min_version to 0
+			unsigned int sysver = GetSysMenuVersion();
+			for( u32 i=0; i < system_hacks.size(); ++i)
+			{
+				if( system_hacks[i].max_version < sysver || system_hacks[i].min_version > sysver)
+				{
+					states_hash[i] = 0;
+				}
+			}
 		}
 	}
 
@@ -579,19 +587,11 @@ s8 LoadSystemHacks(bool load_nand)
 		}
 
 		ISFS_Write( nand_file_handler, &states_hash[0], sizeof( u8 ) * system_hacks.size() );
-		ISFS_Close(nand_file_handler);
-		nand_file_handler = -1;
 	}	
 
-	//Set all system_hacks for system menu > max_version || sysver < min_version to 0
-	unsigned int sysver = GetSysMenuVersion();
-	for( u32 i=0; i < system_hacks.size(); ++i)
-	{
-		if( system_hacks[i].max_version < sysver || system_hacks[i].min_version > sysver)
-		{
-			states_hash[i] = 0;
-		}
-	}
+	if(nand_file_handler >= 0)
+		ISFS_Close( nand_file_handler );
+	nand_file_handler = -1;
 
 	return 1;
 }

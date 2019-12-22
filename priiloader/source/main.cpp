@@ -152,6 +152,7 @@ void SysHackHashSettings( void )
 
 	u16 cur_off=0;
 	s32 menu_off=0;
+	s32 fd = 0;
 	bool redraw=true;
 	while(1)
 	{
@@ -198,7 +199,7 @@ void SysHackHashSettings( void )
 
 					fclose(in);
 
-					s32 fd = ISFS_Open("/title/00000001/00000002/data/hackshas.ini", 1|2 );
+					fd = ISFS_Open("/title/00000001/00000002/data/hackshas.ini", 1|2 );
 					if( fd >= 0 )
 					{
 						//File already exists, delete and recreate!
@@ -245,7 +246,7 @@ handle_hacks_fail:
 				}
 				
 				ret = 0;
-				s32 fd = ISFS_Open("/title/00000001/00000002/data/hacksh_s.ini", 1|2 );
+				fd = ISFS_Open("/title/00000001/00000002/data/hacksh_s.ini", 1|2 );
 
 				if( fd >= 0 )
 				{

@@ -1,9 +1,9 @@
 /*
 
-priiloader/preloader 0.30 - A tool which allows to change the default boot up sequence on the Wii console
+priiloader - A tool which allows to change the default boot up sequence on the Wii console
 Executable Loader - Loads any executable who has been loaded into memory
 
-Copyright (C) 2008-2019  crediar
+Copyright (C) 2008-2019  DacoTaco
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -45,13 +45,12 @@ we stay off them, so by the time we enter the main code, the arguments should st
 asm(R"(.globl _start
 _start:
 #set stack address
-#we do this by retrieving the address we jumped to from ctr and adding the stack start address to it, followed by its size
+#we do this by retrieving the address we jumped to from ctr and adding the stack start address to it, followed by its size (minus the bytes needed as buffer)
 #i am using r18 as buffer, since it looked to be unused at the time.
 	mr		18,1
 	mfctr	1
 	addi	1,1,__crt0stack@l
-	addi	1,1,0x100
-	addi	1,1,-0x0C
+	addi	1,1,0xF4
 #save current stack data
 	stw		0,0(1)
 	stw		18,4(1)
