@@ -108,9 +108,9 @@ bool GetLine(bool reading_nand, std::string& line)
 			}
 
 			if (buf)
-				buf = (char*)mem_realloc(buf, ALIGN32(BLOCK_SIZE*read_count));
+				buf = (char*)mem_realloc(buf, ALIGN32((BLOCK_SIZE*read_count)+1));
 			else
-				buf = (char*)mem_align(32, BLOCK_SIZE*read_count);
+				buf = (char*)mem_align(32, (BLOCK_SIZE*read_count)+1);
 
 			if (!buf)
 			{
@@ -121,26 +121,26 @@ bool GetLine(bool reading_nand, std::string& line)
 			u32 addr = (u32)buf;
 			if (read_count > 1)
 				addr += BLOCK_SIZE*(read_count - 1);
-			else
-				memset(buf, 0, BLOCK_SIZE*read_count);
+			
+			memset((void*)addr, 0, BLOCK_SIZE+1);
 
 			s32 ret = 0;
-			if (reading_nand)
-			{	
-				ret = ISFS_Read(nand_file_handler, (void*)addr, BLOCK_SIZE);
-				if (ret < 0)
-				{
-					throw "Error reading from NAND (" + std::to_string(ret) + ")";
-				}
-			}
-			else
+			do
 			{
-				ret = fread( (void*)addr, sizeof( char ), BLOCK_SIZE, sd_file_handler );
+				if (reading_nand)
+					ret = ISFS_Read(nand_file_handler, (void*)addr, BLOCK_SIZE);
+				else
+					ret = fread( (void*)addr, sizeof( char ), BLOCK_SIZE, sd_file_handler );
+
 				if(ret < 0)
 				{
-					throw "Error reading from SD (" + std::to_string(ret) + ")";
+					std::string err = "Error reading from ";
+					err.append(reading_nand?"NAND":"SD");
+					err.append(" (" + std::to_string(ret) + ")");
+					throw err;
 				}
 			}
+			while(ret < BLOCK_SIZE);
 
 			if(strlen(buf) > BLOCK_SIZE*max_loop)
 			{
@@ -155,7 +155,8 @@ bool GetLine(bool reading_nand, std::string& line)
 			return false;
 		}
 
-		read_line.assign(buf);
+		read_line = std::string(buf);
+		//read_line.assign(buf);
 		mem_free(buf);
 
 		//find the newline and split the string
