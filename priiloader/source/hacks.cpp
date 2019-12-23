@@ -125,6 +125,7 @@ bool GetLine(bool reading_nand, std::string& line)
 			memset((void*)addr, 0, BLOCK_SIZE+1);
 
 			s32 ret = 0;
+			s32 read = 0;
 			do
 			{
 				if (reading_nand)
@@ -132,15 +133,16 @@ bool GetLine(bool reading_nand, std::string& line)
 				else
 					ret = fread( (void*)addr, sizeof( char ), BLOCK_SIZE, sd_file_handler );
 
-				if(ret < 0)
+				if(ret <= 0)
 				{
 					std::string err = "Error reading from ";
 					err.append(reading_nand?"NAND":"SD");
 					err.append(" (" + std::to_string(ret) + ")");
 					throw err;
 				}
+				read += ret;
 			}
-			while(ret < BLOCK_SIZE);
+			while(read < BLOCK_SIZE && (file_pos+read < file_size));
 
 			if(strlen(buf) > BLOCK_SIZE*max_loop)
 			{
