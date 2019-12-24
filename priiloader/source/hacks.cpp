@@ -67,9 +67,9 @@ bool GetLine(bool reading_nand, std::string& line)
 {
 	char* buf = NULL;	
 	std::string read_line;
-	u32 read_count = 0;
+	u32 read_cnt = 0;
 	u32 file_pos = 0;
-	const u16 max_loop = 500;
+	const u16 max_size = 0x2000;
 
 	//Read untill a newline is found
 	try
@@ -86,65 +86,47 @@ bool GetLine(bool reading_nand, std::string& line)
 			file_pos = ftell(sd_file_handler);
 		}
 
+		buf = (char*)mem_align(32,max_size+1);
+		if (!buf)
+		{
+			error = ERROR_MALLOC;
+			throw "error allocating buffer";
+		}
+		memset(buf,0,max_size+1);
+
 		//read untill we have a newline or reach EOF
 		while (
 				file_pos < file_size &&
-				( 
-					buf == NULL || 
-					(
-						file_pos+strnlen(buf,BLOCK_SIZE*max_loop) < file_size &&
-						strstr(buf, "\n") == NULL && 
-						strstr(buf, "\r") == NULL
-					)
-				)
+				file_pos+strnlen(buf,max_size) < file_size &&
+				strstr(buf, "\n") == NULL && 
+				strstr(buf, "\r") == NULL
 			)
-		{		
-			read_count++;
+		{	
 			//are we dealing with a potential overflow?
-			if (read_count > max_loop)
+			if (read_cnt > max_size)
 			{
 				error = ERROR_MALLOC;
 				throw "line to long";
 			}
 
-			if (buf)
-				buf = (char*)mem_realloc(buf, ALIGN32((BLOCK_SIZE*read_count)+1));
-			else
-				buf = (char*)mem_align(32, (BLOCK_SIZE*read_count)+1);
-
-			if (!buf)
-			{
-				error = ERROR_MALLOC;
-				throw "error allocating buffer";
-			}
-			
-			u32 addr = (u32)buf;
-			if (read_count > 1)
-				addr += BLOCK_SIZE*(read_count - 1);
-			
-			memset((void*)addr, 0, BLOCK_SIZE+1);
-
+			u32 addr = read_cnt + (u32)buf;
 			s32 ret = 0;
-			s32 read = 0;
-			do
+
+			if (reading_nand)
+				ret = ISFS_Read(nand_file_handler, (void*)addr, BLOCK_SIZE);
+			else
+				ret = fread( (void*)addr, sizeof( char ), BLOCK_SIZE, sd_file_handler );
+
+			if(ret <= 0)
 			{
-				if (reading_nand)
-					ret = ISFS_Read(nand_file_handler, (void*)addr, BLOCK_SIZE);
-				else
-					ret = fread( (void*)addr, sizeof( char ), BLOCK_SIZE, sd_file_handler );
-
-				if(ret <= 0)
-				{
-					std::string err = "Error reading from ";
-					err.append(reading_nand?"NAND":"SD");
-					err.append(" (" + std::to_string(ret) + ")");
-					throw err;
-				}
-				read += ret;
+				std::string err = "Error reading from ";
+				err.append(reading_nand?"NAND":"SD");
+				err.append(" (" + std::to_string(ret) + ")");
+				throw err;
 			}
-			while(read < BLOCK_SIZE && (file_pos+read < file_size));
+			read_cnt += ret;
 
-			if(strlen(buf) > BLOCK_SIZE*max_loop)
+			if(strlen(buf) > max_size)
 			{
 				throw "buf has overflown";
 			}
@@ -158,7 +140,6 @@ bool GetLine(bool reading_nand, std::string& line)
 		}
 
 		read_line = std::string(buf);
-		//read_line.assign(buf);
 		mem_free(buf);
 
 		//find the newline and split the string
@@ -167,14 +148,11 @@ bool GetLine(bool reading_nand, std::string& line)
 			std::string cut_string = read_line.substr(0,read_line.find("\r"));
 
 		//set the new file position untill after the \r\n, \r or \n
-		file_pos += cut_string.size();
+		file_pos += cut_string.size()+1;
 
 		//cut off any carriage returns
 		if(cut_string.back() == '\r')
-		{
 			cut_string = cut_string.substr(0, cut_string.length() - 1);
-			file_pos++;
-		}
 		if(cut_string.front() == '\r')
 			cut_string = cut_string.substr(1, cut_string.length() - 1);
 
@@ -260,8 +238,13 @@ bool _processLine(system_hack& hack, std::string &line)
 			//should get in the struct as 0x380000002c0000004082001038000036900da9c8480017
 
 			//start new patch if the last patch is already a complete one
-			if(temp_patch->patch.size() > 0 && 
-				( temp_patch->hash.size() > 0 || temp_patch->offset != 0 ))
+			if(	type == "hash" && 
+				temp_patch->patch.size() > 0 && 
+				(
+					temp_patch->hash.size() > 0 || 
+					temp_patch->offset != 0 
+				)
+			  )
 			{
 				hack.patches.push_back(system_patch());
 				temp_patch = &hack.patches.back();
