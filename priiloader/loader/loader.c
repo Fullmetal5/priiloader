@@ -150,13 +150,6 @@ u32 _loadApplication(void* binary, void* parameter)
 		{
 			return 0;
 		}
-		if( dolfile->addressBSS >= 0x90000000 )
-		{
-			//BSS is in mem2 which means its better to reload ios & then load app. i dont really get it but thats what tantric said
-			//currently unused cause this is done for wiimc. however reloading ios also looses ahbprot/dvd access...
-			
-			//place IOS reload here
-		}
 
 		//copy text sections
 		for (s8 i = 0; i < 7; i++) {
@@ -181,11 +174,20 @@ u32 _loadApplication(void* binary, void* parameter)
 			_memset ((void *) dolfile->addressBSS, 0, dolfile->sizeBSS);
 			DCFlushRange((void *) dolfile->addressBSS, dolfile->sizeBSS);
 		}
+		//BSS is in mem2 which means its better to reload ios & then load app (tantric's words)
+		/*currently unused cause this is done for wiimc. however reloading ios also looses ahbprot/dvd access...
+		else if( dolfile->addressBSS >= 0x90000000 )
+		{
+			//place IOS reload here if it would be needed. the application should've reloaded IOS before us.
+		}*/
 
 		//copy over arguments, but only if the dol is meant to have them
-		//devkitpro dol's have room in them to have the argument struct copied over them
+		//devkitpro dol's have a magic word set & room in them to have the argument struct copied over them
 		//some others, not so much (like some bad compressed dols)
-		if (args != NULL && args->argvMagic == ARGV_MAGIC && *(vu32*)(dolfile->entrypoint + 8 | 0x80000000) == 0x00 )
+		if (
+			( args != NULL && args->argvMagic == ARGV_MAGIC) && //our arguments are valid
+			( *(vu32*)(dolfile->entrypoint + 4 | 0x80000000) == ARGV_MAGIC ) //dol supports them too
+			)
         {
 			void* new_argv = (void*)(dolfile->entrypoint + 8);
 			_memcpy(new_argv, args, sizeof(struct __argv));
