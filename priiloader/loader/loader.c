@@ -71,8 +71,8 @@ void _boot(void* binary, void* parameter, u32 parameterCount, u8 isSystemMenu)
 	if(binary == NULL || (parameter == NULL && parameterCount > 0))
 		return;
 
-	u32 ep = (isSystemMenu)?_loadSystemMenu(binary,parameter,parameterCount):_loadApplication(binary,parameter);
-	if(!ep)
+	u32 ep = _loadApplication(binary,(isSystemMenu)?NULL:parameter);
+	if( !ep || (isSystemMenu && ep != 0x80003400))
 		return;
 
 	//nintendo related pokes. TT/f0f claims these make official dols work
@@ -82,6 +82,19 @@ void _boot(void* binary, void* parameter, u32 parameterCount, u8 isSystemMenu)
 
 	if(isSystemMenu)
 	{
+		/* apply offset patches*/
+		if(parameter != NULL && parameterCount > 0)
+		{
+			offset_patch *patch = parameter;
+			for(u32 i = 0;i < parameterCount;i++)
+			{	
+				_memcpy((void*)patch->offset,patch->patch,patch->patch_size);
+				DCFlushRange((void*)patch->offset, patch->patch_size);
+				ICInvalidateRange((void*)patch->offset, patch->patch_size);
+				patch = (offset_patch *)((8 + patch->patch_size) + (u32)patch);
+			}
+		}
+
 		mtmsr(mfmsr() & ~0x8000);
 		mtmsr(mfmsr() | 0x2002);
 		startSysMenu();
@@ -144,6 +157,7 @@ u32 _loadApplication(void* binary, void* parameter)
 	{
 		dolhdr *dolfile;
 		dolfile = (dolhdr *)binary;
+		u8 set_bss = (dolfile->addressBSS > 0x80003400 && dolfile->addressBSS + dolfile->sizeBSS < MAX_ADDRESS);
 
 		//entrypoint & BSS checking
 		if( (dolfile->entrypoint | 0x80000000) < 0x80003400 || (dolfile->entrypoint | 0x80000000) >= MAX_ADDRESS )
@@ -164,12 +178,20 @@ u32 _loadApplication(void* binary, void* parameter)
 		for (s8 i = 0; i < 11; i++) {
 			if ((!dolfile->sizeData[i]) || (dolfile->offsetData[i] < 0x100)) 
 				continue;
+
+			set_bss = 
+				set_bss && 
+				(dolfile->addressData[i]+dolfile->sizeData[i] <= dolfile->addressBSS ||
+				dolfile->addressData[i] >= dolfile->addressBSS + dolfile->sizeBSS);
+
 			_memcpy ((void *) dolfile->addressData[i],binary+dolfile->offsetData[i],dolfile->sizeData[i]);
 			DCFlushRange((void *) dolfile->offsetData[i],dolfile->sizeData[i]);
 		}
 
 		//clear BSS - this is the area containing variables. it is required to clear it so we don't have unexpected results
-		if( dolfile->addressBSS > 0x80003400 && dolfile->addressBSS + dolfile->sizeBSS < MAX_ADDRESS)
+		//cleared before copying the sections kills SM as it has its BSS in the middle of its data sections (nice!)
+		//however, not clearing it might cause issues with loader homebrew and their high entrypoints 
+		if( set_bss )
 		{
 			_memset ((void *) dolfile->addressBSS, 0, dolfile->sizeBSS);
 			DCFlushRange((void *) dolfile->addressBSS, dolfile->sizeBSS);
@@ -196,29 +218,6 @@ u32 _loadApplication(void* binary, void* parameter)
 		return(dolfile->entrypoint | 0x80000000);
 	}
 	return 0;
-}
-
-u32 _loadSystemMenu(void* binary, void* parameter, u32 parameterCount)
-{	
-	u32 entrypoint = _loadApplication(binary,NULL);
-
-	if(entrypoint != 0x80003400)
-		return 0;
-
-	/* apply offset patches*/
-	if(parameter != NULL && parameterCount > 0)
-	{
-		offset_patch *patch = parameter;
-		for(u32 i = 0;i < parameterCount;i++)
-		{	
-			_memcpy((void*)patch->offset,patch->patch,patch->patch_size);
-			DCFlushRange((void*)patch->offset, patch->patch_size);
-			ICInvalidateRange((void*)patch->offset, patch->patch_size);
-			patch = (offset_patch *)((8 + patch->patch_size) + (u32)patch);
-		}
-	}
-
-	return entrypoint;
 }
 
 //unstub asm code by crediar. basically boots the system menu NAND boot code
