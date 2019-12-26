@@ -392,7 +392,7 @@ s8 LoadSystemHacks(bool load_nand)
 	//read the hacks file size
 	if (!load_nand)
 	{
-		sd_file_handler = fopen("fat:/apps/priiloader/hacks_hash.ini","r");
+		sd_file_handler = fopen("fat:/apps/priiloader/hacks_hash.ini","rb");
 		if(!sd_file_handler)
 		{
 			gprintf("fopen error : %s", strerror(errno));

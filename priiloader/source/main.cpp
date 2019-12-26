@@ -1019,11 +1019,11 @@ s8 BootDolFromMem( u8 *binary , u8 HW_AHBPROT_ENABLED, struct __argv *args )
 		VIDEO_WaitVSync();
 		__exception_closeall();
 
-		gprintf("BootDolFromMem : starting binary...");	
+		gprintf("BootDolFromMem : starting binary... 0x%08X",loader_addr);	
 		ICSync();
 		loader(binary,args,args != NULL,0);
 		
-		//alternate booting code. seems to be as good(or bad) as the above code
+		//old alternate booting code. i prefer the loader xD
 		/*u32 level;
 		__STM_Close();
 		ISFS_Deinitialize();

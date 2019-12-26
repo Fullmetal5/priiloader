@@ -175,9 +175,8 @@ u32 _loadApplication(void* binary, void* parameter)
 			DCFlushRange((void *) dolfile->offsetData[i],dolfile->sizeData[i]);
 		}
 
-		if( 
-			( dolfile->addressBSS + dolfile->sizeBSS < 0x80F00000 ||(dolfile->addressBSS > 0x81500000 && dolfile->addressBSS + dolfile->sizeBSS < MAX_ADDRESS) ) &&
-			dolfile->addressBSS > 0x80003400 )
+		//clear BSS - this is the area containing variables. it is required to clear it so we don't have unexpected results
+		if( dolfile->addressBSS > 0x80003400 && dolfile->addressBSS + dolfile->sizeBSS < MAX_ADDRESS)
 		{
 			_memset ((void *) dolfile->addressBSS, 0, dolfile->sizeBSS);
 			DCFlushRange((void *) dolfile->addressBSS, dolfile->sizeBSS);
